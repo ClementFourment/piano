@@ -335,6 +335,7 @@ export function Editor({ doc, onBack, onChange }: Props) {
   }
 
   // ── Statut de la mesure courante ──
+  const mesureCourante = score.measures[curseur.mesure];
   const capacite = measureCapacity(score.timeSig);
   const rempli = M.remplissage(score, curseur.mesure, cle);
   const nomPortee = cle === "treble" ? "main droite" : "main gauche";
@@ -430,6 +431,12 @@ export function Editor({ doc, onBack, onChange }: Props) {
               onMesure={allerMesure}
               onAjouterMesures={(n) => appliquer(M.ajouterMesures(etat, n, curseur.mesure))}
               onSupprimerMesure={() => appliquer(M.supprimerMesure(etat, curseur.mesure))}
+              barre={mesureCourante.barre ?? (curseur.mesure === score.measures.length - 1 ? "final" : "simple")}
+              repriseDebut={!!mesureCourante.repriseDebut}
+              volta={mesureCourante.volta ?? null}
+              onBarre={(b) => appliquer(M.reglerMesure(etat, curseur.mesure, { barre: b }))}
+              onRepriseDebut={(v) => appliquer(M.reglerMesure(etat, curseur.mesure, { repriseDebut: v }))}
+              onVolta={(v) => appliquer(M.reglerMesure(etat, curseur.mesure, { volta: v ?? undefined }))}
               onTempo={(t) => modifierScore({ tempo: t })}
               onChiffrage={(c) => {
                 const [num, den] = c.split("/").map(Number);

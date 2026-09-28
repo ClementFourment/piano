@@ -5,7 +5,7 @@
 //   qui valent jusqu'à la fin de la mesure, à la même octave ;
 // - les croches et doubles croches sont ligaturées par temps.
 
-import { KEY_SIGNATURES, measureCapacity, noteBeats, type Accidental, type Articulation, type Duration, type Note, type Score } from "../shared/score";
+import { KEY_SIGNATURES, measureCapacity, noteBeats, type Accidental, type Articulation, type Barre, type Duration, type Measure, type Note, type Score } from "../shared/score";
 import { notesSuivantes, segments, suiviAlterations, tetesLiees } from "./solfege";
 
 const DUR: Record<Duration, string> = { whole: "1", half: "2", quarter: "4", eighth: "8", sixteenth: "16" };
@@ -63,6 +63,14 @@ function layer(notes: Note[], score: Score): string {
   return out;
 }
 
+const BARRE_MEI: Record<Barre, string> = { simple: "single", double: "dbl", final: "end", reprise: "rptend" };
+
+/** Attributs left/right d'une mesure (barres et reprises). */
+function barres(m: Measure, derniere: boolean): string {
+  const droite = m.barre ? BARRE_MEI[m.barre] : derniere ? "end" : "";
+  return (m.repriseDebut ? ' left="rptstart"' : "") + (droite && droite !== "single" ? ` right="${droite}"` : "");
+}
+
 const ARTIC: Partial<Record<Articulation, string>> = { staccato: "stacc", accent: "acc", tenuto: "ten", marcato: "marc" };
 
 /** Élément <artic> (le point d'orgue est à part : c'est un élément de contrôle). */
@@ -101,10 +109,10 @@ export function scoreToMei(score: Score): string {
       })
       .join("");
 
-  const mesures = score.measures
-    .map(
+  const derniere = score.measures.length - 1;
+  const xmlMesures = score.measures.map(
       (m, i) =>
-        `<measure xml:id="${m.id}" n="${i + 1}"${i === score.measures.length - 1 ? ' right="end"' : ""}>` +
+        `<measure xml:id="${m.id}" n="${i + 1}"${barres(m, i === derniere)}>` +
         `<staff n="1"><layer n="1">${layer(m.treble, score)}</layer></staff>` +
         `<staff n="2"><layer n="1">${layer(m.bass, score)}</layer></staff>` +
         indications(m.treble, 1) +
@@ -114,8 +122,17 @@ export function scoreToMei(score: Score): string {
             `<rend fontstyle="normal"><rend glyph.auth="smufl">&#xE1D5;</rend> = ${score.tempo}</rend></tempo>`
           : "") +
         `</measure>`,
-    )
-    .join("");
+    );
+
+  // Les mesures consécutives d'une même case sont regroupées dans un <ending>.
+  let mesures = "";
+  score.measures.forEach((m, i) => {
+    const prec = score.measures[i - 1]?.volta;
+    const suiv = score.measures[i + 1]?.volta;
+    if (m.volta && m.volta !== prec) mesures += `<ending xml:id="${m.id}-v" n="${m.volta}" label="${m.volta}.">`;
+    mesures += xmlMesures[i];
+    if (m.volta && m.volta !== suiv) mesures += "</ending>";
+  });
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <mei xmlns="http://www.music-encoding.org/ns/mei" meiversion="5.1">

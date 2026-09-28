@@ -1,6 +1,6 @@
 // Palette d'outils de l'éditeur (colonne de gauche), reprise du prototype.
 
-import { DYNAMICS, KEY_SIGNATURES, type Accidental, type Articulation, type Clef, type Duration, type Dynamic, type KeySignature, type Letter } from "../../shared/score";
+import { DYNAMICS, KEY_SIGNATURES, type Accidental, type Articulation, type Barre, type Clef, type Duration, type Dynamic, type KeySignature, type Letter } from "../../shared/score";
 
 export const NOMS_NOTES: Record<Letter, string> = { C: "Do", D: "Ré", E: "Mi", F: "Fa", G: "Sol", A: "La", B: "Si" };
 
@@ -88,6 +88,13 @@ export interface PaletteProps {
   onMesure: (delta: -1 | 1) => void;
   onAjouterMesures: (n: number) => void;
   onSupprimerMesure: () => void;
+  /** Réglages de la mesure courante. */
+  barre: Barre;
+  repriseDebut: boolean;
+  volta: 1 | 2 | null;
+  onBarre: (b: Barre) => void;
+  onRepriseDebut: (v: boolean) => void;
+  onVolta: (v: 1 | 2 | null) => void;
   onTempo: (t: number) => void;
   onChiffrage: (c: string) => void;
   onArmure: (k: KeySignature) => void;
@@ -285,7 +292,31 @@ export function Palette(p: PaletteProps) {
             + 4 mesures
           </button>
         </div>
-        <button className="btn small danger-outline full" onClick={p.onSupprimerMesure}>
+        <label className="dot-row" title="La reprise recommence à cette mesure">
+          <input type="checkbox" checked={p.repriseDebut} onChange={(e) => p.onRepriseDebut(e.target.checked)} /> Début de reprise ‖:
+        </label>
+        <label className="field-label" htmlFor="barre">
+          Barre de fin de mesure
+        </label>
+        <select id="barre" value={p.barre} onChange={(e) => p.onBarre(e.target.value as Barre)}>
+          <option value="simple">Simple │</option>
+          <option value="double">Double ‖</option>
+          <option value="final">Finale (fin du morceau)</option>
+          <option value="reprise">Fin de reprise :‖</option>
+        </select>
+        <label className="field-label" htmlFor="volta">
+          Case
+        </label>
+        <select
+          id="volta"
+          value={p.volta ?? ""}
+          onChange={(e) => p.onVolta(e.target.value ? (Number(e.target.value) as 1 | 2) : null)}
+        >
+          <option value="">Aucune</option>
+          <option value="1">1re fois (jouée avant de reprendre)</option>
+          <option value="2">2e fois (jouée après la reprise)</option>
+        </select>
+        <button className="btn small danger-outline full espace" onClick={p.onSupprimerMesure}>
           Supprimer cette mesure
         </button>
       </section>

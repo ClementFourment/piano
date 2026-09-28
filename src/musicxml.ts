@@ -161,11 +161,41 @@ function portee(notes: Note[], score: Score, staff: 1 | 2, ctx: Contexte): { xml
   return { xml, duree };
 }
 
+/** Début de reprise et début de case. */
+function barreGauche(score: Score, i: number): string {
+  const m = score.measures[i];
+  const debutCase = m.volta && m.volta !== score.measures[i - 1]?.volta;
+  if (!m.repriseDebut && !debutCase) return "";
+  return (
+    `<barline location="left">` +
+    (m.repriseDebut ? "<bar-style>heavy-light</bar-style>" : "") +
+    (debutCase ? `<ending number="${m.volta}" type="start">${m.volta}.</ending>` : "") +
+    (m.repriseDebut ? '<repeat direction="forward"/>' : "") +
+    `</barline>`
+  );
+}
+
+/** Barre de fin, fin de reprise et fin de case. */
+function barreDroite(score: Score, i: number): string {
+  const m = score.measures[i];
+  const barre = m.barre ?? (i === score.measures.length - 1 ? "final" : "simple");
+  const finCase = m.volta && m.volta !== score.measures[i + 1]?.volta;
+  if (barre === "simple" && !finCase) return "";
+  const style = { simple: "regular", double: "light-light", final: "light-heavy", reprise: "light-heavy" }[barre];
+  return (
+    `<barline location="right"><bar-style>${style}</bar-style>` +
+    // Case 1 fermée par un crochet, case 2 laissée ouverte (usage courant).
+    (finCase ? `<ending number="${m.volta}" type="${m.volta === 1 ? "stop" : "discontinue"}"/>` : "") +
+    (barre === "reprise" ? '<repeat direction="backward"/>' : "") +
+    `</barline>`
+  );
+}
+
 export function scoreToMusicXml(score: Score): string {
   const ctx = contexte(score);
   const mesures = score.measures
     .map((m, i) => {
-      let xml = `<measure number="${i + 1}">`;
+      let xml = `<measure number="${i + 1}">` + barreGauche(score, i);
       if (i === 0) {
         xml +=
           `<attributes><divisions>${DIVISIONS}</divisions>` +
@@ -182,7 +212,7 @@ export function scoreToMusicXml(score: Score): string {
       const haut = portee(m.treble, score, 1, ctx);
       const bas = portee(m.bass, score, 2, ctx);
       xml += haut.xml + `<backup><duration>${haut.duree}</duration></backup>` + bas.xml;
-      if (i === score.measures.length - 1) xml += `<barline location="right"><bar-style>light-heavy</bar-style></barline>`;
+      xml += barreDroite(score, i);
       return xml + `</measure>`;
     })
     .join("\n");

@@ -55,10 +55,20 @@ export interface Note {
   hairpin?: { form: "cres" | "dim"; end: string };
 }
 
+export const BARRES = ["simple", "double", "final", "reprise"] as const;
+/** Barre à la fin de la mesure ; « reprise » = fin de reprise (:‖). */
+export type Barre = (typeof BARRES)[number];
+
 export interface Measure {
   id: string;
   treble: Note[];
   bass: Note[];
+  /** Barre de fin (absente : simple, ou finale pour la dernière mesure). */
+  barre?: Barre;
+  /** La mesure commence par un début de reprise (‖:). */
+  repriseDebut?: boolean;
+  /** Case de première ou deuxième fois (les mesures consécutives d'une même case forment un seul crochet). */
+  volta?: 1 | 2;
 }
 
 export interface Score {
@@ -201,7 +211,11 @@ export function lireScore(v: unknown): Score | string {
     const bass = lirePortee(m.bass);
     if (!treble || !bass) return `Note invalide dans la mesure ${measures.length + 1}.`;
     const id = estId(m.id) ? m.id : newId();
-    measures.push({ id, treble, bass });
+    const mesure: Measure = { id, treble, bass };
+    if (BARRES.includes(m.barre as Barre)) mesure.barre = m.barre as Barre;
+    if (m.repriseDebut === true) mesure.repriseDebut = true;
+    if (m.volta === 1 || m.volta === 2) mesure.volta = m.volta;
+    measures.push(mesure);
   }
 
   const texte = (t: unknown, defaut: string) =>

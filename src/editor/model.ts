@@ -13,6 +13,7 @@ import {
   type Clef,
   type Duration,
   type Dynamic,
+  type Measure,
   type Note,
   type Pitch,
   type Score,
@@ -377,6 +378,20 @@ export function supprimerMesure(etat: Etat, mesure: number): Resultat {
     curseur: { mesure: m, cle: etat.curseur.cle, index: measures[m][etat.curseur.cle].length },
     selection: null,
   };
+}
+
+type ReglagesMesure = Pick<Measure, "barre" | "repriseDebut" | "volta">;
+
+/** Barre de fin, début de reprise, case : une valeur `undefined` retire le réglage. */
+export function reglerMesure(etat: Etat, mesure: number, reglages: Partial<ReglagesMesure>): Etat {
+  const measures = etat.score.measures.slice();
+  const m: Measure = { ...measures[mesure] };
+  for (const [cle, valeur] of Object.entries(reglages) as [keyof ReglagesMesure, never][]) {
+    if (valeur === undefined || valeur === false) delete m[cle];
+    else m[cle] = valeur;
+  }
+  measures[mesure] = m;
+  return { ...etat, score: { ...etat.score, measures } };
 }
 
 export function changerChiffrage(etat: Etat, num: number, den: number): Resultat {

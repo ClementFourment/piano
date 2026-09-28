@@ -4,6 +4,7 @@
 import { SplendidGrandPiano } from "smplr";
 import type { VerovioToolkit } from "verovio/esm";
 import { lireExpression } from "./expression";
+import { deplier, lireStructure } from "./reprises";
 
 type Piano = ReturnType<typeof SplendidGrandPiano>;
 
@@ -21,10 +22,51 @@ async function chargerPiano() {
 }
 
 interface Evenement {
-  /** Instant en secondes depuis le début. */
+  /** Instant en secondes depuis le début (reprises dépliées). */
   t: number;
   on: string[];
   off: string[];
+  debutMesure: boolean;
+}
+
+/**
+ * Chronologie de Verovio, découpée par mesure puis remise dans l'ordre de lecture
+ * (Verovio ne joue pas les reprises : il enchaîne les mesures une seule fois).
+ */
+export function chronologieDepliee(tk: VerovioToolkit): Evenement[] {
+  const timemap = tk.renderToTimemap({ includeMeasures: true });
+  const parMesure = new Map<string, { debut: number; evts: { rel: number; on: string[]; off: string[] }[] }>();
+  const ordreDoc: string[] = [];
+  let courante: { debut: number; evts: { rel: number; on: string[]; off: string[] }[] } | null = null;
+  for (const e of timemap) {
+    if (e.measureOn) {
+      courante = { debut: e.tstamp, evts: [] };
+      parMesure.set(e.measureOn, courante);
+      ordreDoc.push(e.measureOn);
+    }
+    courante?.evts.push({ rel: e.tstamp - courante.debut, on: e.on ?? [], off: e.off ?? [] });
+  }
+  const finDoc = timemap.length ? timemap[timemap.length - 1].tstamp : 0;
+  const duree = new Map(
+    ordreDoc.map((id, i) => [id, (i + 1 < ordreDoc.length ? parMesure.get(ordreDoc[i + 1])!.debut : finDoc) - parMesure.get(id)!.debut]),
+  );
+
+  const structure = lireStructure(tk);
+  const ordre = deplier(structure)
+    .map((i) => structure[i].id)
+    .filter((id) => parMesure.has(id));
+
+  const evenements: Evenement[] = [];
+  let decalage = 0;
+  for (const id of ordre.length ? ordre : ordreDoc) {
+    parMesure.get(id)!.evts.forEach((ev, k) => {
+      evenements.push({ t: (decalage + ev.rel) / 1000, on: ev.on, off: ev.off, debutMesure: k === 0 });
+    });
+    decalage += duree.get(id)!;
+  }
+  // Dernier instant : fin de la dernière mesure jouée.
+  evenements.push({ t: decalage / 1000, on: [], off: [], debutMesure: true });
+  return evenements;
 }
 
 export interface Lecture {
@@ -44,8 +86,7 @@ interface Options {
 export async function jouer(tk: VerovioToolkit, conteneur: HTMLElement, opts: Options = {}): Promise<Lecture> {
   const { ctx, piano } = await chargerPiano();
 
-  const timemap = tk.renderToTimemap();
-  const evenements: Evenement[] = timemap.map((e) => ({ t: e.tstamp / 1000, on: e.on ?? [], off: e.off ?? [] }));
+  const evenements = chronologieDepliee(tk);
   const fin = evenements.length ? evenements[evenements.length - 1].t : 0;
 
   const expr = lireExpression(tk);
@@ -83,6 +124,8 @@ export async function jouer(tk: VerovioToolkit, conteneur: HTMLElement, opts: Op
     const ecoule = ctx.currentTime - t0;
     while (prochain < evenements.length && evenements[prochain].t <= ecoule) {
       const e = evenements[prochain++];
+      // Nouvelle mesure (peut-être après un retour de reprise) : on repart d'un surlignage vide.
+      if (e.debutMesure) eteindreTout();
       for (const id of e.off) {
         const el = trouver(id);
         if (el) {
