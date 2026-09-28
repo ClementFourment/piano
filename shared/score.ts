@@ -27,6 +27,9 @@ export interface Pitch {
   octave: number;
 }
 
+export const DYNAMICS = ["pp", "p", "mp", "mf", "f", "ff"] as const;
+export type Dynamic = (typeof DYNAMICS)[number];
+
 export interface Note {
   id: string;
   rest: boolean;
@@ -34,6 +37,14 @@ export interface Note {
   pitches: Pitch[];
   duration: Duration;
   dotted: boolean;
+  /** Liaison de prolongation vers la note suivante de la même portée (hauteurs communes). */
+  tie?: boolean;
+  /** Liaison de phrasé : identifiant de la dernière note liée (même portée, plus loin). */
+  slurEnd?: string;
+  /** Nuance qui commence sur cette note. */
+  dynamic?: Dynamic;
+  /** Soufflet (crescendo ou decrescendo) de cette note jusqu'à `end`. */
+  hairpin?: { form: "cres" | "dim"; end: string };
 }
 
 export interface Measure {
@@ -111,15 +122,24 @@ function lirePitch(p: unknown): Pitch | null {
  * Lit une note. Accepte aussi l'ancien format du prototype
  * (une seule hauteur posée directement sur la note : letter/accidental/octave).
  */
+const estId = (v: unknown): v is string => typeof v === "string" && /^[a-zA-Z][\w-]{0,40}$/.test(v);
+
 function lireNote(n: unknown): Note | null {
   if (!isObj(n)) return null;
   if (!DURATIONS.includes(n.duration as Duration)) return null;
-  const base = {
-    id: typeof n.id === "string" && /^[a-zA-Z][\w-]{0,40}$/.test(n.id) ? n.id : newId(),
+  const base: Omit<Note, "rest" | "pitches"> = {
+    id: estId(n.id) ? n.id : newId(),
     duration: n.duration as Duration,
     dotted: n.dotted === true,
   };
+  // Indications facultatives : ignorées si elles sont mal formées.
+  if (DYNAMICS.includes(n.dynamic as Dynamic)) base.dynamic = n.dynamic as Dynamic;
+  if (isObj(n.hairpin) && (n.hairpin.form === "cres" || n.hairpin.form === "dim") && estId(n.hairpin.end)) {
+    base.hairpin = { form: n.hairpin.form, end: n.hairpin.end };
+  }
   if (n.rest === true) return { ...base, rest: true, pitches: [] };
+  if (n.tie === true) base.tie = true;
+  if (estId(n.slurEnd)) base.slurEnd = n.slurEnd;
   const brutes = Array.isArray(n.pitches) ? n.pitches : [n];
   if (brutes.length === 0 || brutes.length > LIMITES.hauteursParAccord) return null;
   const pitches: Pitch[] = [];
@@ -165,7 +185,7 @@ export function lireScore(v: unknown): Score | string {
     const treble = lirePortee(m.treble);
     const bass = lirePortee(m.bass);
     if (!treble || !bass) return `Note invalide dans la mesure ${measures.length + 1}.`;
-    const id = typeof m.id === "string" && /^[a-zA-Z][\w-]{0,40}$/.test(m.id) ? m.id : newId();
+    const id = estId(m.id) ? m.id : newId();
     measures.push({ id, treble, bass });
   }
 

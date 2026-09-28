@@ -275,6 +275,12 @@ input {
 .raccourcis dt { font-weight: 600; white-space: nowrap; }
 .raccourcis dd { margin: 0; color: var(--ink-soft); }
 
+.dyn-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.3rem; margin: 0.2rem 0 0.5rem; }
+.dyn-btn { padding: 0.4rem 0; border: 1px solid var(--line); background: #fff; border-radius: 6px; cursor: pointer; font-family: "Fraunces", Georgia, serif; font-style: italic; font-weight: 600; font-size: 14px; color: var(--ink); }
+.dyn-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
+.dyn-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.soufflet { font-size: 15px; font-weight: 400; transform: scaleX(1.6); display: inline-block; margin-right: 0.2rem; }
+
 /* Repères dans la partition */
 .sheets.editable .sheet { cursor: text; }
 .sheets.editable .note, .sheets.editable .rest, .sheets.editable .mRest, .sheets.editable .chord { cursor: pointer; }

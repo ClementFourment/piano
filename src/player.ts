@@ -3,6 +3,7 @@
 
 import { SplendidGrandPiano } from "smplr";
 import type { VerovioToolkit } from "verovio/esm";
+import { lireExpression } from "./expression";
 
 type Piano = ReturnType<typeof SplendidGrandPiano>;
 
@@ -47,11 +48,20 @@ export async function jouer(tk: VerovioToolkit, conteneur: HTMLElement, opts: Op
   const evenements: Evenement[] = timemap.map((e) => ({ t: e.tstamp / 1000, on: e.on ?? [], off: e.off ?? [] }));
   const fin = evenements.length ? evenements[evenements.length - 1].t : 0;
 
+  const expr = lireExpression(tk);
   const t0 = ctx.currentTime + 0.15;
   for (const e of evenements) {
     for (const id of e.on) {
-      const { pitch, duration } = tk.getMIDIValuesForElement(id);
-      if (pitch > 0 && duration > 0) piano.start({ note: pitch, time: t0 + e.t, duration: duration / 1000, velocity: 80 });
+      // Fin d'une prolongation : la note sonne déjà, on ne la rejoue pas.
+      if (expr.finsDeProlongation.has(id)) continue;
+      const { pitch, duration, time } = tk.getMIDIValuesForElement(id);
+      if (!(pitch > 0 && duration > 0)) continue;
+      // Début d'une prolongation : on tient la note jusqu'au bout de la chaîne.
+      let total = duration;
+      for (let suiv = expr.prolongations.get(id), n = 0; suiv && n < 64; suiv = expr.prolongations.get(suiv), n++) {
+        total += tk.getMIDIValuesForElement(suiv).duration;
+      }
+      piano.start({ note: pitch, time: t0 + e.t, duration: total / 1000, velocity: expr.velocite(time) });
     }
   }
 

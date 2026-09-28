@@ -11,6 +11,7 @@ import {
   type Accidental,
   type Clef,
   type Duration,
+  type Dynamic,
   type Note,
   type Pitch,
   type Score,
@@ -193,7 +194,7 @@ export function supprimer(etat: Etat, id: string): Resultat {
   if (!p) return etat;
   const notes = etat.score.measures[p.mesure][p.cle].filter((n) => n.id !== id);
   return {
-    score: avecPortee(etat.score, p.mesure, p.cle, notes),
+    score: sansReferencesA(avecPortee(etat.score, p.mesure, p.cle, notes), id),
     curseur: { mesure: p.mesure, cle: p.cle, index: p.index },
     selection: null,
   };
@@ -235,6 +236,94 @@ export function naviguer(etat: Etat, dir: -1 | 1): Etat {
   return { ...etat, selection: s.id, curseur: { mesure: s.mesure, cle, index: s.index + 1 } };
 }
 
+// ── Liaisons et nuances ─────────────────────────────────────────────────────
+
+/** Note suivante sur la même portée, en passant la barre de mesure. */
+export function suivante(score: Score, id: string): Note | null {
+  const p = trouver(score, id);
+  if (!p) return null;
+  for (let m = p.mesure; m < score.measures.length; m++) {
+    const notes = score.measures[m][p.cle];
+    const debut = m === p.mesure ? p.index + 1 : 0;
+    if (debut < notes.length) return notes[debut];
+  }
+  return null;
+}
+
+const memeHauteur = (a: Pitch, b: Pitch) => a.letter === b.letter && a.octave === b.octave;
+
+/**
+ * Touche L : relie la note à la suivante. Même hauteur → prolongation ;
+ * sinon liaison de phrasé. Sur une liaison de phrasé existante, l'allonge d'une note.
+ */
+export function lier(etat: Etat, id: string): Resultat {
+  const note = trouverNote(etat.score, id);
+  if (!note) return etat;
+  if (note.rest) return "On ne lie pas un silence.";
+  if (note.tie) return "Cette note est déjà prolongée (Maj+L pour retirer la liaison).";
+
+  const depuis = note.slurEnd ?? id;
+  const suiv = suivante(etat.score, depuis);
+  if (!suiv) return "Il n'y a pas de note après, sur cette portée.";
+  if (suiv.rest) return "La note suivante est un silence.";
+
+  if (!note.slurEnd && note.pitches.some((p) => suiv.pitches.some((q) => memeHauteur(p, q)))) {
+    return { ...etat, score: modifierNote(etat.score, id, (n) => ({ ...n, tie: true })) };
+  }
+  return { ...etat, score: modifierNote(etat.score, id, (n) => ({ ...n, slurEnd: suiv.id })) };
+}
+
+/** Maj+L : retire la prolongation et la liaison de phrasé qui partent de la note. */
+export function delier(etat: Etat, id: string): Resultat {
+  return {
+    ...etat,
+    score: modifierNote(etat.score, id, ({ tie: _t, slurEnd: _s, ...n }) => n),
+  };
+}
+
+/** Pose une nuance (ou la retire si c'est la même). */
+export function nuance(etat: Etat, id: string, d: Dynamic): Resultat {
+  return {
+    ...etat,
+    score: modifierNote(etat.score, id, ({ dynamic, ...n }) => (dynamic === d ? n : { ...n, dynamic: d })),
+  };
+}
+
+/** Soufflet depuis la note ; appuyer de nouveau l'allonge d'une note. */
+export function soufflet(etat: Etat, id: string, form: "cres" | "dim"): Resultat {
+  const note = trouverNote(etat.score, id);
+  if (!note) return etat;
+  const depuis = note.hairpin?.form === form ? note.hairpin.end : id;
+  const suiv = suivante(etat.score, depuis);
+  if (!suiv) return "Il faut au moins une note après pour un soufflet.";
+  return { ...etat, score: modifierNote(etat.score, id, (n) => ({ ...n, hairpin: { form, end: suiv.id } })) };
+}
+
+/** Retire nuance et soufflet de la note. */
+export function sansNuance(etat: Etat, id: string): Resultat {
+  return { ...etat, score: modifierNote(etat.score, id, ({ dynamic: _d, hairpin: _h, ...n }) => n) };
+}
+
+function trouverNote(score: Score, id: string): Note | null {
+  const p = trouver(score, id);
+  return p ? score.measures[p.mesure][p.cle][p.index] : null;
+}
+
+/** Après une suppression : retire les liaisons et soufflets qui aboutissaient à la note. */
+function sansReferencesA(score: Score, id: string): Score {
+  const nettoyer = (n: Note): Note => {
+    if (n.slurEnd !== id && n.hairpin?.end !== id) return n;
+    const copie = { ...n };
+    if (copie.slurEnd === id) delete copie.slurEnd;
+    if (copie.hairpin?.end === id) delete copie.hairpin;
+    return copie;
+  };
+  return {
+    ...score,
+    measures: score.measures.map((m) => ({ ...m, treble: m.treble.map(nettoyer), bass: m.bass.map(nettoyer) })),
+  };
+}
+
 // ── Mesures et en-tête ──────────────────────────────────────────────────────
 
 export function ajouterMesures(etat: Etat, nombre: number, apres: number): Etat {
@@ -245,10 +334,13 @@ export function ajouterMesures(etat: Etat, nombre: number, apres: number): Etat 
 
 export function supprimerMesure(etat: Etat, mesure: number): Resultat {
   if (etat.score.measures.length <= 1) return "La partition doit garder au moins une mesure.";
-  const measures = etat.score.measures.filter((_, i) => i !== mesure);
+  const retiree = etat.score.measures[mesure];
+  let score: Score = { ...etat.score, measures: etat.score.measures.filter((_, i) => i !== mesure) };
+  for (const n of [...retiree.treble, ...retiree.bass]) score = sansReferencesA(score, n.id);
+  const measures = score.measures;
   const m = Math.min(mesure, measures.length - 1);
   return {
-    score: { ...etat.score, measures },
+    score,
     curseur: { mesure: m, cle: etat.curseur.cle, index: measures[m][etat.curseur.cle].length },
     selection: null,
   };

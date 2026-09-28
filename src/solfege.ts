@@ -69,3 +69,29 @@ export function groupesLigature(notes: Note[], timeSig: Score["timeSig"]): (Note
   // Un groupe d'une seule note n'est pas ligaturé.
   return res.map((g) => (g && g.length > 1 ? g : null));
 }
+
+/** Pour chaque note, la note qui la suit sur la même portée (en passant les barres de mesure). */
+export function notesSuivantes(score: Score): Map<string, Note> {
+  const suivantes = new Map<string, Note>();
+  for (const cle of ["treble", "bass"] as const) {
+    let prec: Note | null = null;
+    for (const m of score.measures) {
+      for (const n of m[cle]) {
+        if (prec) suivantes.set(prec.id, n);
+        prec = n;
+      }
+    }
+  }
+  return suivantes;
+}
+
+/** Paires de têtes de notes reliées par une liaison de prolongation (indices dans `pitches`). */
+export function tetesLiees(n: Note, suivante: Note | undefined): [number, number][] {
+  if (!n.tie || !suivante || n.rest || suivante.rest) return [];
+  const paires: [number, number][] = [];
+  n.pitches.forEach((p, i) => {
+    const j = suivante.pitches.findIndex((q) => q.letter === p.letter && q.octave === p.octave);
+    if (j >= 0) paires.push([i, j]);
+  });
+  return paires;
+}

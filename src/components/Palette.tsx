@@ -1,6 +1,6 @@
 // Palette d'outils de l'éditeur (colonne de gauche), reprise du prototype.
 
-import { KEY_SIGNATURES, type Accidental, type Clef, type Duration, type KeySignature, type Letter } from "../../shared/score";
+import { DYNAMICS, KEY_SIGNATURES, type Accidental, type Clef, type Duration, type Dynamic, type KeySignature, type Letter } from "../../shared/score";
 
 export const NOMS_NOTES: Record<Letter, string> = { C: "Do", D: "Ré", E: "Mi", F: "Fa", G: "Sol", A: "La", B: "Si" };
 
@@ -17,6 +17,11 @@ const ALTERATIONS: { a: NonNullable<Accidental>; glyphe: string; nom: string; to
   { a: "flat", glyphe: "♭", nom: "Bémol", touche: "-" },
   { a: "natural", glyphe: "♮", nom: "Bécarre", touche: "=" },
 ];
+
+const NOMS_NUANCES: Record<Dynamic, string> = {
+  pp: "pianissimo (très doux)", p: "piano (doux)", mp: "mezzo piano (moyennement doux)",
+  mf: "mezzo forte (moyennement fort)", f: "forte (fort)", ff: "fortissimo (très fort)",
+};
 
 export const CHIFFRAGES = ["2/4", "3/4", "4/4", "5/4", "2/2", "3/8", "6/8", "9/8", "12/8"];
 
@@ -58,6 +63,13 @@ export interface PaletteProps {
   onModeAccord: (v: boolean) => void;
   onSilence: () => void;
   onSupprimer: () => void;
+  /** Nuance de la note visée (sélection ou dernière saisie), pour l'afficher enfoncée. */
+  nuance: Dynamic | null;
+  onLier: () => void;
+  onDelier: () => void;
+  onNuance: (d: Dynamic) => void;
+  onSoufflet: (f: "cres" | "dim") => void;
+  onSansNuance: () => void;
   onMesure: (delta: -1 | 1) => void;
   onAjouterMesures: (n: number) => void;
   onSupprimerMesure: () => void;
@@ -169,6 +181,42 @@ export function Palette(p: PaletteProps) {
       </section>
 
       <section className="rail-section">
+        <div className="rail-title">Liaisons et nuances</div>
+        <div className="row2">
+          <button className="btn small" onClick={p.onLier} title="Relie la note à la suivante (touche L) ; appuyer encore allonge la liaison">
+            ‿ Lier
+          </button>
+          <button className="btn small" onClick={p.onDelier} title="Maj + L">
+            Délier
+          </button>
+        </div>
+        <div className="dyn-grid" role="group" aria-label="Nuances">
+          {DYNAMICS.map((d) => (
+            <button
+              key={d}
+              className={`dyn-btn${p.nuance === d ? " active" : ""}`}
+              onClick={() => p.onNuance(d)}
+              aria-pressed={p.nuance === d}
+              title={NOMS_NUANCES[d]}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
+        <div className="row2">
+          <button className="btn small" onClick={() => p.onSoufflet("cres")} title="Crescendo (touche <) ; appuyer encore l'allonge">
+            <span className="soufflet">&lt;</span> cresc.
+          </button>
+          <button className="btn small" onClick={() => p.onSoufflet("dim")} title="Decrescendo (touche >) ; appuyer encore l'allonge">
+            <span className="soufflet">&gt;</span> decresc.
+          </button>
+        </div>
+        <button className="btn small ghost full" onClick={p.onSansNuance}>
+          Retirer nuance et soufflet
+        </button>
+      </section>
+
+      <section className="rail-section">
         <div className="rail-title">Mesures</div>
         <div className="measure-nav">
           <button className="btn small icon" onClick={() => p.onMesure(-1)} aria-label="Mesure précédente">
@@ -252,6 +300,8 @@ export function Palette(p: PaletteProps) {
             <dt>↑ ↓</dt><dd>monter/descendre la note (Ctrl : octave)</dd>
             <dt>← →</dt><dd>note précédente / suivante</dd>
             <dt>Tab</dt><dd>changer de portée</dd>
+            <dt>L / Maj+L</dt><dd>lier / délier</dd>
+            <dt>&lt; &gt;</dt><dd>crescendo / decrescendo</dd>
             <dt>⌫ / Suppr</dt><dd>effacer</dd>
             <dt>Échap</dt><dd>désélectionner</dd>
             <dt>Espace</dt><dd>écouter / arrêter</dd>

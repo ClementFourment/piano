@@ -119,6 +119,13 @@ export function Editor({ doc, onBack, onChange }: Props) {
     setAlteration((x) => (x === a ? null : a));
   }
 
+  /** Applique une commande à la note visée : la sélection, sinon la dernière saisie. */
+  function surCible(op: (id: string) => M.Resultat) {
+    const n = M.cible(etat);
+    if (!n) return signaler("Sélectionnez une note (clic), ou saisissez-en une d'abord.");
+    appliquer(op(n.id));
+  }
+
   function effacer() {
     if (selection) return appliquer(M.supprimer(etat, selection));
     appliquer(M.supprimerAvant(etat));
@@ -174,6 +181,8 @@ export function Editor({ doc, onBack, onChange }: Props) {
         else setOctaves((o) => ({ ...o, [cle]: Math.max(0, Math.min(8, o[cle] + (k === "ArrowUp" ? 1 : -1))) }));
       } else if (k === "ArrowLeft" || k === "ArrowRight") appliquer(M.naviguer(etat, k === "ArrowLeft" ? -1 : 1), false);
       else if (k === "Tab") changerCle(cle === "treble" ? "bass" : "treble");
+      else if (k.toLowerCase() === "l") surCible((id) => (e.shiftKey ? M.delier(etat, id) : M.lier(etat, id)));
+      else if (k === "<" || k === ">") surCible((id) => M.soufflet(etat, id, k === "<" ? "cres" : "dim"));
       else if (k === "Backspace" || k === "Delete") effacer();
       else if (k === "Escape") appliquer({ ...etat, selection: null }, false);
       else if (k === " ") lecture.basculer();
@@ -396,6 +405,12 @@ export function Editor({ doc, onBack, onChange }: Props) {
               onModeAccord={setModeAccord}
               onSilence={silence}
               onSupprimer={effacer}
+              nuance={M.cible(etat)?.dynamic ?? null}
+              onLier={() => surCible((id) => M.lier(etat, id))}
+              onDelier={() => surCible((id) => M.delier(etat, id))}
+              onNuance={(d) => surCible((id) => M.nuance(etat, id, d))}
+              onSoufflet={(f) => surCible((id) => M.soufflet(etat, id, f))}
+              onSansNuance={() => surCible((id) => M.sansNuance(etat, id))}
               onMesure={allerMesure}
               onAjouterMesures={(n) => appliquer(M.ajouterMesures(etat, n, curseur.mesure))}
               onSupprimerMesure={() => appliquer(M.supprimerMesure(etat, curseur.mesure))}

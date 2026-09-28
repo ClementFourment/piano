@@ -6,7 +6,7 @@
 // - les croches et doubles croches sont ligaturées par temps.
 
 import { KEY_SIGNATURES, measureCapacity, noteBeats, type Accidental, type Duration, type Note, type Score } from "../shared/score";
-import { groupesLigature, suiviAlterations } from "./solfege";
+import { groupesLigature, notesSuivantes, suiviAlterations, tetesLiees } from "./solfege";
 
 const DUR: Record<Duration, string> = { whole: "1", half: "2", quarter: "4", eighth: "8", sixteenth: "16" };
 const ACCID: Record<NonNullable<Accidental>, string> = { sharp: "s", flat: "f", natural: "n" };
@@ -63,12 +63,34 @@ export function scoreToMei(score: Score): string {
   const titre = esc(score.title);
   const compositeur = esc(score.composer);
 
+  const suivantes = notesSuivantes(score);
+  const ids = new Set(score.measures.flatMap((m) => [...m.treble, ...m.bass].map((n) => n.id)));
+  const tete = (n: Note, i: number) => (n.pitches.length > 1 ? `${n.id}${CHORD_SEP}${i}` : n.id);
+
+  /** Liaisons, nuances et soufflets qui commencent dans la mesure (placés entre les portées). */
+  const indications = (notes: Note[], staff: 1 | 2) =>
+    notes
+      .map((n) => {
+        let xml = "";
+        const suiv = suivantes.get(n.id);
+        for (const [i, j] of tetesLiees(n, suiv)) xml += `<tie startid="#${tete(n, i)}" endid="#${tete(suiv!, j)}"/>`;
+        if (n.slurEnd && ids.has(n.slurEnd)) xml += `<slur staff="${staff}" startid="#${n.id}" endid="#${n.slurEnd}"/>`;
+        if (n.dynamic) xml += `<dynam staff="${staff}" place="below" startid="#${n.id}">${n.dynamic}</dynam>`;
+        if (n.hairpin && ids.has(n.hairpin.end)) {
+          xml += `<hairpin form="${n.hairpin.form}" staff="${staff}" place="below" startid="#${n.id}" endid="#${n.hairpin.end}"/>`;
+        }
+        return xml;
+      })
+      .join("");
+
   const mesures = score.measures
     .map(
       (m, i) =>
         `<measure xml:id="${m.id}" n="${i + 1}"${i === score.measures.length - 1 ? ' right="end"' : ""}>` +
         `<staff n="1"><layer n="1">${layer(m.treble, score)}</layer></staff>` +
         `<staff n="2"><layer n="1">${layer(m.bass, score)}</layer></staff>` +
+        indications(m.treble, 1) +
+        indications(m.bass, 2) +
         (i === 0
           ? `<tempo tstamp="1" staff="1" place="above" mm="${score.tempo}" mm.unit="4" midi.bpm="${score.tempo}">` +
             `<rend fontstyle="normal"><rend glyph.auth="smufl">&#xE1D5;</rend> = ${score.tempo}</rend></tempo>`
