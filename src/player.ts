@@ -88,13 +88,17 @@ export async function jouer(tk: VerovioToolkit, conteneur: HTMLElement, opts: Op
       }
       if (premiere) opts.onNote?.(premiere);
     }
-    if (ecoule > fin + 0.3) return terminer();
     raf = requestAnimationFrame(tick);
   };
+
+  // La fin est détectée par un minuteur : requestAnimationFrame est suspendu
+  // quand l'onglet passe en arrière-plan, alors que le son, lui, continue.
+  const minuteur = setTimeout(() => terminer(), (t0 - ctx.currentTime + fin + 0.3) * 1000);
 
   function terminer() {
     if (finie) return;
     finie = true;
+    clearTimeout(minuteur);
     cancelAnimationFrame(raf);
     piano.stop();
     eteindreTout();

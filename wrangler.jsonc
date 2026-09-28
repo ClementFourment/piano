@@ -12,9 +12,11 @@
     {
       "binding": "DB",
       "database_name": "piano",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "a035aa7f-e8e8-4c5a-961a-369de2db3e64",
       "migrations_dir": "migrations"
     }
   ],
+  // Adresse de test tant que piano.clementfourment.fr sert encore l'ancien éditeur.
+  "workers_dev": true,
   "observability": { "enabled": true }
 }
