@@ -12,6 +12,8 @@
   },
   "type": "module",
   "dependencies": {
+    "@spotify/basic-pitch": "^1.0.1",
+    "@tensorflow/tfjs-backend-wasm": "^3.21.0",
     "hono": "^4.13.10",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

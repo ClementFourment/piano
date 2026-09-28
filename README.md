@@ -47,3 +47,17 @@ Même commande pour changer le mot de passe d'un compte existant. Sans `--remote
 npm run db:migrate:remote     # seulement si une nouvelle migration a été ajoutée
 npm run deploy
 ```
+
+## Saisie au micro
+
+Bouton « 🎤 Micro » de l'éditeur : on joue en suivant un métronome (décompte d'une mesure),
+les notes s'écrivent à partir de la mesure du curseur.
+
+- Capture : `src/micro/capture.ts` (AudioWorklet `public/micro-worklet.js`, 22 050 Hz, sans traitement « voix »).
+- Transcription : [Basic Pitch](https://github.com/spotify/basic-pitch-ts) (Spotify) dans un Web Worker
+  (`src/micro/transcripteur.worker.ts`), moteur TensorFlow.js WebAssembly (fichiers dans `public/tfjs-wasm/`,
+  modèle dans `public/basic-pitch/`). Analyse par tranches d'environ 1 s, avec ~2 s de retard.
+- Mise en partition : `src/micro/partition.ts` (calage sur la grille, accords, mains, liaisons, altérations,
+  filtre des harmoniques).
+- Réglages choisis avec le banc d'essai `src/micro/banc-essai.ts` (dans la console du serveur de développement :
+  `(await import("/src/micro/banc-essai.ts")).rechercheReglages()`).

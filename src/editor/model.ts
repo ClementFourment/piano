@@ -394,6 +394,34 @@ export function reglerMesure(etat: Etat, mesure: number, reglages: Partial<Regla
   return { ...etat, score: { ...etat.score, measures } };
 }
 
+const estVide = (m: Measure) => [...m.treble, ...m.bass].every((n) => n.rest);
+
+/**
+ * Place des mesures enregistrées à partir de la mesure `depuis` : les mesures vides
+ * (sans notes) sont remplies en gardant leurs réglages (barres, reprises) ; à la première
+ * mesure qui contient déjà des notes, le reste est inséré avant elle.
+ */
+export function insererEnregistrement(etat: Etat, enregistrees: Measure[], depuis: number): Etat {
+  const measures = etat.score.measures.slice();
+  let k = depuis;
+  for (let j = 0; j < enregistrees.length; j++, k++) {
+    const cible = measures[k];
+    if (cible && estVide(cible)) {
+      measures[k] = { ...cible, treble: enregistrees[j].treble, bass: enregistrees[j].bass };
+    } else {
+      measures.splice(k, 0, ...enregistrees.slice(j));
+      k += enregistrees.length - j;
+      break;
+    }
+  }
+  const derniere = Math.min(k, measures.length) - 1;
+  return {
+    score: { ...etat.score, measures },
+    curseur: { mesure: derniere, cle: etat.curseur.cle, index: measures[derniere][etat.curseur.cle].length },
+    selection: null,
+  };
+}
+
 export function changerChiffrage(etat: Etat, num: number, den: number): Resultat {
   const capacite = measureCapacity({ num, den });
   const trop = etat.score.measures.findIndex(

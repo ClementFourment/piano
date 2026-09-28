@@ -317,6 +317,26 @@ input {
   .rail { max-height: 72vh; }
 }
 
+/* ── Enregistrement au micro ── */
+.micro-panel {
+  position: fixed; right: 1rem; bottom: 1rem; z-index: 45; width: min(92vw, 340px);
+  background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 16px 50px #0000002e; padding: 0.9rem 1rem 1rem; display: flex; flex-direction: column; gap: 0.6rem;
+}
+.micro-panel p { margin: 0; }
+.micro-tete { display: flex; align-items: center; justify-content: space-between; font-family: "Fraunces", serif; font-size: 16px; }
+.micro-grille { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.5rem 0.7rem; }
+.micro-grille label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 11.5px; color: var(--ink-soft); min-width: 0; }
+.micro-grille select, .micro-grille input[type="number"] { width: 100%; min-width: 0; }
+.micro-grille label.dot-row { flex-direction: row; align-items: center; margin: 0; grid-column: 1 / -1; font-size: 13px; color: var(--ink); }
+.micro-grille select, .micro-grille input[type="number"] { font: inherit; font-size: 13px; border: 1px solid var(--line); border-radius: 6px; padding: 0.35rem 0.45rem; background: #fff; color: var(--ink); }
+.micro-temps { display: flex; justify-content: center; gap: 0.7rem; padding: 0.3rem 0; }
+.micro-temps .point { width: 16px; height: 16px; border-radius: 50%; background: var(--line); transition: background 0.05s; }
+.micro-temps .point.fort { width: 20px; height: 20px; }
+.micro-temps .point.actif { background: var(--accent); }
+.niveau { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.niveau > div { height: 100%; background: #3f7a4c; transition: width 0.08s; }
+
 /* ── Impression / PDF ── */
 .print-only { display: none; }
 @page { size: A4; margin: 0; }

@@ -11,12 +11,14 @@ import {
   type Duration,
   type KeySignature,
   type Letter,
+  type Measure,
   type Score,
 } from "../../shared/score";
 import { api } from "../api";
 import * as M from "../editor/model";
 import { scoreToMei } from "../mei";
 import { getToolkit, rendre } from "../verovio";
+import { MicroPanel } from "./MicroPanel";
 import { NOMS_NOTES, Palette } from "./Palette";
 import { DownloadMenu, ShareMenu, useImpression } from "./ScoreMenus";
 import { useFormat, useLecture } from "./ScoreView";
@@ -52,6 +54,9 @@ export function Editor({ doc, onBack, onChange }: Props) {
   const [alteration, setAlteration] = useState<Accidental>(null);
   const [modeAccord, setModeAccord] = useState(false);
   const [paletteOuverte, setPaletteOuverte] = useState(false);
+  const [microOuvert, setMicroOuvert] = useState(false);
+  /** Mesures provisoires pendant un enregistrement au micro (non enregistrées). */
+  const [apercu, setApercu] = useState<Measure[] | null>(null);
   const [message, setMessage] = useState("");
 
   const signaler = useCallback((texte: string) => setMessage(texte), []);
@@ -156,6 +161,8 @@ export function Editor({ doc, onBack, onChange }: Props) {
   // ── Clavier ──
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      // Pendant un enregistrement au micro, le clavier ne modifie pas la partition.
+      if (microOuvert) return;
       const t = e.target;
       if (t instanceof Element && t.closest("input, select, textarea, [contenteditable]")) return;
       const ctrl = e.ctrlKey || e.metaKey;
@@ -204,7 +211,11 @@ export function Editor({ doc, onBack, onChange }: Props) {
   });
 
   // ── Rendu Verovio ──
-  const mei = useMemo(() => scoreToMei(score), [score]);
+  const affichee = useMemo(
+    () => (apercu ? M.insererEnregistrement(etat, apercu, etat.curseur.mesure).score : etat.score),
+    [apercu, etat],
+  );
+  const mei = useMemo(() => scoreToMei(affichee), [affichee]);
   const format = useFormat();
   const [pages, setPages] = useState<string[] | null>(null);
   const [erreur, setErreur] = useState("");
@@ -380,6 +391,9 @@ export function Editor({ doc, onBack, onChange }: Props) {
             <button className="btn rail-toggle" onClick={() => setPaletteOuverte(true)}>
               🎹 Outils
             </button>
+            <button className="btn" onClick={() => (lecture.arreter(), setMicroOuvert(true))} disabled={microOuvert} title="Écrire les notes en jouant au micro">
+              🎤 Micro
+            </button>
             <button className="btn primary" onClick={lecture.basculer} disabled={!pages} title="Espace">
               {lecture.libelle}
             </button>
@@ -472,6 +486,28 @@ export function Editor({ doc, onBack, onChange }: Props) {
             )}
           </main>
         </div>
+
+        {microOuvert && (
+          <MicroPanel
+            tempo={score.tempo}
+            timeSig={score.timeSig}
+            armure={score.keySignature}
+            onApercu={setApercu}
+            onTermine={(mesures) => {
+              setApercu(null);
+              setMicroOuvert(false);
+              if (!mesures.some((m) => [...m.treble, ...m.bass].some((n) => !n.rest))) {
+                return signaler("Aucune note n'a été reconnue. Rapprochez le micro ou augmentez la sensibilité.");
+              }
+              appliquer(M.insererEnregistrement(etat, mesures, curseur.mesure));
+              signaler(`${mesures.length} mesure${mesures.length > 1 ? "s" : ""} ajoutée${mesures.length > 1 ? "s" : ""}. Ctrl+Z pour annuler.`);
+            }}
+            onFermer={() => {
+              setApercu(null);
+              setMicroOuvert(false);
+            }}
+          />
+        )}
 
         <div className={`toast${message ? " show" : ""}`} role="alert">
           {message}
