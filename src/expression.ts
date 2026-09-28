@@ -19,7 +19,19 @@ export interface Expression {
   finsDeProlongation: Set<string>;
   /** Vélocité à un instant donné (ms). */
   velocite(ms: number): number;
+  /** Effet des articulations sur une tête de note : durée ×facteur, vélocité +bonus. */
+  articulation(id: string): { duree: number; bonus: number };
 }
+
+/** Staccato : moitié de la durée ; accent et marcato : plus fort ; point d'orgue : tenu deux fois plus. */
+const EFFETS: Record<string, { duree: number; bonus: number }> = {
+  stacc: { duree: 0.5, bonus: 0 },
+  stacciss: { duree: 0.3, bonus: 0 },
+  acc: { duree: 1, bonus: 16 },
+  marc: { duree: 0.75, bonus: 26 },
+  ten: { duree: 1, bonus: 4 },
+  fermata: { duree: 2, bonus: 0 },
+};
 
 const cible = (el: Element, attr: string) => el.getAttribute(attr)?.replace(/^#/, "") ?? null;
 
@@ -72,7 +84,32 @@ export function lireExpression(tk: VerovioToolkit): Expression {
     return [{ t0, t1, depart, arrivee }];
   });
 
+  // Articulations : <artic> dans une note ou un accord, <fermata> rattaché par startid.
+  const effets = new Map<string, { duree: number; bonus: number }>();
+  const appliquer = (el: Element | null, valeurs: string[]) => {
+    if (!el) return;
+    // Un accord transmet l'effet à chacune de ses notes.
+    const cibles = el.localName === "chord" ? Array.from(el.getElementsByTagNameNS("*", "note")) : [el];
+    for (const c of cibles) {
+      const id = c.getAttribute("xml:id");
+      if (!id) continue;
+      const e = { ...(effets.get(id) ?? { duree: 1, bonus: 0 }) };
+      for (const v of valeurs) {
+        const effet = EFFETS[v];
+        if (effet) {
+          e.duree *= effet.duree;
+          e.bonus += effet.bonus;
+        }
+      }
+      effets.set(id, e);
+    }
+  };
+  for (const a of tous("artic")) appliquer(a.parentElement, (a.getAttribute("artic") ?? "").split(/\s+/));
+  const parId = new Map(Array.from(doc.getElementsByTagNameNS("*", "*")).map((el) => [el.getAttribute("xml:id"), el]));
+  for (const f of tous("fermata")) appliquer(parId.get(cible(f, "startid")) ?? null, ["fermata"]);
+
   return {
+    articulation: (id) => effets.get(id) ?? { duree: 1, bonus: 0 },
     prolongations,
     finsDeProlongation,
     velocite(ms) {

@@ -1,6 +1,6 @@
 // Palette d'outils de l'éditeur (colonne de gauche), reprise du prototype.
 
-import { DYNAMICS, KEY_SIGNATURES, type Accidental, type Clef, type Duration, type Dynamic, type KeySignature, type Letter } from "../../shared/score";
+import { DYNAMICS, KEY_SIGNATURES, type Accidental, type Articulation, type Clef, type Duration, type Dynamic, type KeySignature, type Letter } from "../../shared/score";
 
 export const NOMS_NOTES: Record<Letter, string> = { C: "Do", D: "Ré", E: "Mi", F: "Fa", G: "Sol", A: "La", B: "Si" };
 
@@ -16,6 +16,14 @@ const ALTERATIONS: { a: NonNullable<Accidental>; glyphe: string; nom: string; to
   { a: "sharp", glyphe: "♯", nom: "Dièse", touche: "+" },
   { a: "flat", glyphe: "♭", nom: "Bémol", touche: "-" },
   { a: "natural", glyphe: "♮", nom: "Bécarre", touche: "=" },
+];
+
+const ARTICS: { a: Articulation; glyphe: string; nom: string }[] = [
+  { a: "staccato", glyphe: "•", nom: "Staccato : note piquée, détachée (touche S)" },
+  { a: "accent", glyphe: ">", nom: "Accent : note appuyée" },
+  { a: "tenuto", glyphe: "–", nom: "Tenuto : note tenue sur toute sa durée" },
+  { a: "marcato", glyphe: "^", nom: "Marcato : note très appuyée" },
+  { a: "fermata", glyphe: "𝄐", nom: "Point d'orgue : note tenue plus longtemps" },
 ];
 
 const NOMS_NUANCES: Record<Dynamic, string> = {
@@ -42,6 +50,7 @@ export interface PaletteProps {
   octave: number;
   duree: Duration;
   pointee: boolean;
+  triolet: boolean;
   alteration: Accidental;
   modeAccord: boolean;
   /** Une note est sélectionnée : les boutons la modifient au lieu d'en saisir une nouvelle. */
@@ -58,6 +67,10 @@ export interface PaletteProps {
   onOctave: (delta: number) => void;
   onDuree: (d: Duration) => void;
   onPointee: () => void;
+  onTriolet: () => void;
+  /** Articulations de la note visée. */
+  articulations: Articulation[];
+  onArticulation: (a: Articulation) => void;
   onAlteration: (a: NonNullable<Accidental>) => void;
   onNote: (l: Letter) => void;
   onModeAccord: (v: boolean) => void;
@@ -131,9 +144,15 @@ export function Palette(p: PaletteProps) {
             </button>
           ))}
         </div>
-        <label className="dot-row" title="Touche .">
-          <input type="checkbox" checked={p.pointee} onChange={p.onPointee} /> Pointée
-        </label>
+        <div className="checks">
+          <label className="dot-row" title="Touche .">
+            <input type="checkbox" checked={p.pointee} onChange={p.onPointee} /> Pointée
+          </label>
+          <label className="dot-row" title="Touche T : 3 notes dans le temps de 2">
+            <input type="checkbox" checked={p.triolet} onChange={p.onTriolet} /> Triolet
+          </label>
+        </div>
+        {p.triolet && !p.selection && <p className="chord-hint">Les notes saisies forment des triolets. Décochez après le groupe.</p>}
       </section>
 
       <section className="rail-section">
@@ -178,6 +197,24 @@ export function Palette(p: PaletteProps) {
         <p className="fill-status" aria-live="polite">
           {p.statut}
         </p>
+      </section>
+
+      <section className="rail-section">
+        <div className="rail-title">Articulations</div>
+        <div className="artic-grid" role="group" aria-label="Articulations">
+          {ARTICS.map((a) => (
+            <button
+              key={a.a}
+              className={`dyn-btn artic${p.articulations.includes(a.a) ? " active" : ""}`}
+              onClick={() => p.onArticulation(a.a)}
+              aria-pressed={p.articulations.includes(a.a)}
+              title={a.nom}
+              aria-label={a.nom}
+            >
+              {a.glyphe}
+            </button>
+          ))}
+        </div>
       </section>
 
       <section className="rail-section">
@@ -300,6 +337,8 @@ export function Palette(p: PaletteProps) {
             <dt>↑ ↓</dt><dd>monter/descendre la note (Ctrl : octave)</dd>
             <dt>← →</dt><dd>note précédente / suivante</dd>
             <dt>Tab</dt><dd>changer de portée</dd>
+            <dt>T</dt><dd>triolet</dd>
+            <dt>S</dt><dd>staccato</dd>
             <dt>L / Maj+L</dt><dd>lier / délier</dd>
             <dt>&lt; &gt;</dt><dd>crescendo / decrescendo</dd>
             <dt>⌫ / Suppr</dt><dd>effacer</dd>

@@ -27,6 +27,9 @@ export interface Pitch {
   octave: number;
 }
 
+export const ARTICULATIONS = ["staccato", "accent", "tenuto", "marcato", "fermata"] as const;
+export type Articulation = (typeof ARTICULATIONS)[number];
+
 export const DYNAMICS = ["pp", "p", "mp", "mf", "f", "ff"] as const;
 export type Dynamic = (typeof DYNAMICS)[number];
 
@@ -37,6 +40,9 @@ export interface Note {
   pitches: Pitch[];
   duration: Duration;
   dotted: boolean;
+  /** Note de triolet : dure les 2/3 de sa valeur écrite (3 notes dans le temps de 2). */
+  triolet?: boolean;
+  articulations?: Articulation[];
   /** Liaison de prolongation vers la note suivante de la même portée (hauteurs communes). */
   tie?: boolean;
   /** Liaison de phrasé : identifiant de la dernière note liée (même portée, plus loin). */
@@ -65,8 +71,9 @@ export interface Score {
 
 export const BEATS: Record<Duration, number> = { whole: 4, half: 2, quarter: 1, eighth: 0.5, sixteenth: 0.25 };
 
-export function noteBeats(n: Pick<Note, "duration" | "dotted">): number {
-  return BEATS[n.duration] * (n.dotted ? 1.5 : 1);
+/** Durée réelle d'une note, en noires (pointée : ×1,5 ; triolet : ×2/3). */
+export function noteBeats(n: Pick<Note, "duration" | "dotted" | "triolet">): number {
+  return BEATS[n.duration] * (n.dotted ? 1.5 : 1) * (n.triolet ? 2 / 3 : 1);
 }
 
 /** Durée d'une mesure, en noires. */
@@ -133,6 +140,11 @@ function lireNote(n: unknown): Note | null {
     dotted: n.dotted === true,
   };
   // Indications facultatives : ignorées si elles sont mal formées.
+  if (n.triolet === true) base.triolet = true;
+  if (Array.isArray(n.articulations)) {
+    const a = ARTICULATIONS.filter((x) => (n.articulations as unknown[]).includes(x));
+    if (a.length) base.articulations = a;
+  }
   if (DYNAMICS.includes(n.dynamic as Dynamic)) base.dynamic = n.dynamic as Dynamic;
   if (isObj(n.hairpin) && (n.hairpin.form === "cres" || n.hairpin.form === "dim") && estId(n.hairpin.end)) {
     base.hairpin = { form: n.hairpin.form, end: n.hairpin.end };

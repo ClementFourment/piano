@@ -48,6 +48,7 @@ export function Editor({ doc, onBack, onChange }: Props) {
   const [octaves, setOctaves] = useState<Record<Clef, number>>({ treble: 4, bass: 3 });
   const [duree, setDuree] = useState<Duration>("quarter");
   const [pointee, setPointee] = useState(false);
+  const [triolet, setTriolet] = useState(false);
   const [alteration, setAlteration] = useState<Accidental>(null);
   const [modeAccord, setModeAccord] = useState(false);
   const [paletteOuverte, setPaletteOuverte] = useState(false);
@@ -89,6 +90,7 @@ export function Editor({ doc, onBack, onChange }: Props) {
     if (!noteSelectionnee) return;
     setDuree(noteSelectionnee.duration);
     setPointee(noteSelectionnee.dotted);
+    setTriolet(!!noteSelectionnee.triolet);
   }, [noteSelectionnee]);
 
   // ── Commandes ──
@@ -99,18 +101,24 @@ export function Editor({ doc, onBack, onChange }: Props) {
     setAlteration(null);
     if (accord || modeAccord) return appliquer(M.ajouterAuAccord(etat, pitch));
     if (selection) return appliquer(M.remplacerHauteur(etat, selection, pitch));
-    appliquer(M.inserer(etat, { pitches: [pitch], duration: duree, dotted: pointee }));
+    appliquer(M.inserer(etat, { pitches: [pitch], duration: duree, dotted: pointee, triolet }));
   }
 
   function silence() {
     if (selection) return appliquer(M.enSilence(etat, selection));
-    appliquer(M.inserer(etat, { pitches: [], duration: duree, dotted: pointee }));
+    appliquer(M.inserer(etat, { pitches: [], duration: duree, dotted: pointee, triolet }));
   }
 
   function choisirDuree(d: Duration, dot = pointee) {
     setDuree(d);
     setPointee(dot);
     if (selection) appliquer(M.changerDuree(etat, selection, d, dot));
+  }
+
+  /** Sur une sélection, bascule la note ; sinon, les prochaines notes seront (ou non) des triolets. */
+  function basculerTriolet() {
+    if (selection) return appliquer(M.basculerTriolet(etat, selection));
+    setTriolet((t) => !t);
   }
 
   /** Palette : sur une sélection, change la note ; sinon, prépare la prochaine. */
@@ -181,6 +189,8 @@ export function Editor({ doc, onBack, onChange }: Props) {
         else setOctaves((o) => ({ ...o, [cle]: Math.max(0, Math.min(8, o[cle] + (k === "ArrowUp" ? 1 : -1))) }));
       } else if (k === "ArrowLeft" || k === "ArrowRight") appliquer(M.naviguer(etat, k === "ArrowLeft" ? -1 : 1), false);
       else if (k === "Tab") changerCle(cle === "treble" ? "bass" : "treble");
+      else if (k.toLowerCase() === "t") basculerTriolet();
+      else if (k.toLowerCase() === "s") surCible((id) => M.articuler(etat, id, "staccato"));
       else if (k.toLowerCase() === "l") surCible((id) => (e.shiftKey ? M.delier(etat, id) : M.lier(etat, id)));
       else if (k === "<" || k === ">") surCible((id) => M.soufflet(etat, id, k === "<" ? "cres" : "dim"));
       else if (k === "Backspace" || k === "Delete") effacer();
@@ -385,6 +395,10 @@ export function Editor({ doc, onBack, onChange }: Props) {
               octave={octaves[cle]}
               duree={duree}
               pointee={pointee}
+              triolet={triolet}
+              onTriolet={basculerTriolet}
+              articulations={M.cible(etat)?.articulations ?? []}
+              onArticulation={(a) => surCible((id) => M.articuler(etat, id, a))}
               alteration={alteration}
               modeAccord={modeAccord}
               selection={selection !== null}

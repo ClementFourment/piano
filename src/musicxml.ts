@@ -1,11 +1,11 @@
 // Export MusicXML 4.0 (partwise) : une partie « Piano » à deux portées.
 // S'ouvre dans MuseScore, Sibelius, Finale, Dorico…
 
-import { KEY_SIGNATURES, measureCapacity, noteBeats, type Accidental, type Duration, type Note, type Score } from "../shared/score";
-import { groupesLigature, notesSuivantes, suiviAlterations, tetesLiees } from "./solfege";
+import { KEY_SIGNATURES, measureCapacity, noteBeats, type Accidental, type Articulation, type Duration, type Note, type Score } from "../shared/score";
+import { notesSuivantes, segments, suiviAlterations, tetesLiees } from "./solfege";
 
-/** Unités par noire : 4 → la double croche vaut 1. */
-const DIVISIONS = 4;
+/** Unités par noire : 12, divisible par 4 (doubles croches) et par 3 (triolets). */
+const DIVISIONS = 12;
 const TYPE: Record<Duration, string> = { whole: "whole", half: "half", quarter: "quarter", eighth: "eighth", sixteenth: "16th" };
 const ACCIDENT: Record<NonNullable<Accidental>, string> = { sharp: "sharp", flat: "flat", natural: "natural" };
 
@@ -66,6 +66,16 @@ function contexte(score: Score): Contexte {
   return ctx;
 }
 
+const ARTICULATION_XML: Partial<Record<Articulation, string>> = {
+  staccato: "<staccato/>", accent: "<accent/>", tenuto: "<tenuto/>", marcato: '<strong-accent type="up"/>',
+};
+
+function articulationsXml(n: Note): string {
+  const a = (n.articulations ?? []).map((x) => ARTICULATION_XML[x]).filter(Boolean).join("");
+  const orgue = n.articulations?.includes("fermata") ? '<fermata type="upright"/>' : "";
+  return (a ? `<articulations>${a}</articulations>` : "") + orgue;
+}
+
 /** Vélocité de chaque nuance ramenée à l'échelle MusicXML (100 = forte… environ). */
 const SON_NUANCE: Record<string, number> = { pp: 38, p: 54, mp: 69, mf: 84, f: 102, ff: 118 };
 
@@ -82,10 +92,19 @@ function portee(notes: Note[], score: Score, staff: 1 | 2, ctx: Contexte): { xml
   }
 
   const alteration = suiviAlterations(score.keySignature);
-  const groupes = groupesLigature(notes, score.timeSig);
+  // Groupe de ligature et position dans un triolet, pour chaque note.
+  const infos = new Map<Note, { ligature: Note[] | null; triolet: "start" | "stop" | "milieu" | "seul" | null }>();
+  for (const seg of segments(notes, score.timeSig)) {
+    seg.notes.forEach((n, i) => {
+      const dernier = i === seg.notes.length - 1;
+      const triolet = !seg.triolet ? null : seg.notes.length === 1 ? "seul" : i === 0 ? "start" : dernier ? "stop" : "milieu";
+      infos.set(n, { ligature: seg.ligatures[i], triolet });
+    });
+  }
   let xml = "";
   let duree = 0;
-  notes.forEach((n, idx) => {
+  notes.forEach((n) => {
+    const info = infos.get(n)!;
     // Indications placées avant la note (elles s'attachent à son instant).
     if (n.dynamic) xml += direction(`<dynamics><${n.dynamic}/></dynamics>`, `<sound dynamics="${SON_NUANCE[n.dynamic]}"/>`);
     if (n.hairpin && ctx.finsDeSoufflet.has(n.hairpin.end)) {
@@ -94,8 +113,14 @@ function portee(notes: Note[], score: Score, staff: 1 | 2, ctx: Contexte): { xml
 
     const d = unites(noteBeats(n));
     const figure = `${fin}<type>${TYPE[n.duration]}</type>${n.dotted ? "<dot/>" : ""}`;
+    const modification = n.triolet ? "<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>" : "";
+    // Groupe incomplet d'une seule note : début et fin sur la même note.
+    const marqueTriolet =
+      (info.triolet === "start" || info.triolet === "seul" ? '<tuplet type="start" bracket="no"/>' : "") +
+      (info.triolet === "stop" || info.triolet === "seul" ? '<tuplet type="stop"/>' : "");
     if (n.rest) {
-      xml += `<note><rest/><duration>${d}</duration>${figure}<staff>${staff}</staff></note>`;
+      const notations = marqueTriolet + articulationsXml(n);
+      xml += `<note><rest/><duration>${d}</duration>${figure}${modification}<staff>${staff}</staff>${notations ? `<notations>${notations}</notations>` : ""}</note>`;
     } else {
       const liees = new Set(tetesLiees(n, ctx.suivantes.get(n.id)).map(([i]) => i));
       n.pitches.forEach((p, i) => {
@@ -105,6 +130,7 @@ function portee(notes: Note[], score: Score, staff: 1 | 2, ctx: Contexte): { xml
         const ties = (arrivee ? '<tie type="stop"/>' : "") + (depart ? '<tie type="start"/>' : "");
         let notations = (arrivee ? '<tied type="stop"/>' : "") + (depart ? '<tied type="start"/>' : "");
         if (i === 0) {
+          notations += marqueTriolet + articulationsXml(n);
           const finLiaison = ctx.finsDeLiaison.get(n.id);
           if (finLiaison) notations += `<slur type="stop" number="${finLiaison}"/>`;
           const debutLiaison = ctx.numeros.get(n.id);
@@ -115,8 +141,9 @@ function portee(notes: Note[], score: Score, staff: 1 | 2, ctx: Contexte): { xml
           `<pitch><step>${p.letter}</step>${alter ? `<alter>${alter}</alter>` : ""}<octave>${p.octave}</octave></pitch>` +
           `<duration>${d}</duration>${ties}${figure}` +
           (p.accidental ? `<accidental>${ACCIDENT[p.accidental]}</accidental>` : "") +
+          modification +
           `<staff>${staff}</staff>` +
-          (i === 0 ? ligatures(n, groupes[idx]) : "") +
+          (i === 0 ? ligatures(n, info.ligature) : "") +
           (notations ? `<notations>${notations}</notations>` : "") +
           `</note>`;
       });

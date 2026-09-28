@@ -61,7 +61,9 @@ export async function jouer(tk: VerovioToolkit, conteneur: HTMLElement, opts: Op
       for (let suiv = expr.prolongations.get(id), n = 0; suiv && n < 64; suiv = expr.prolongations.get(suiv), n++) {
         total += tk.getMIDIValuesForElement(suiv).duration;
       }
-      piano.start({ note: pitch, time: t0 + e.t, duration: total / 1000, velocity: expr.velocite(time) });
+      const artic = expr.articulation(id);
+      const velocity = Math.max(1, Math.min(127, expr.velocite(time) + artic.bonus));
+      piano.start({ note: pitch, time: t0 + e.t, duration: (total * artic.duree) / 1000, velocity });
     }
   }
 

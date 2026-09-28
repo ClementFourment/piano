@@ -279,6 +279,9 @@ input {
 .dyn-btn { padding: 0.4rem 0; border: 1px solid var(--line); background: #fff; border-radius: 6px; cursor: pointer; font-family: "Fraunces", Georgia, serif; font-style: italic; font-weight: 600; font-size: 14px; color: var(--ink); }
 .dyn-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
 .dyn-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.checks { display: flex; gap: 1rem; }
+.artic-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.3rem; }
+.dyn-btn.artic { font-style: normal; font-size: 16px; }
 .soufflet { font-size: 15px; font-weight: 400; transform: scaleX(1.6); display: inline-block; margin-right: 0.2rem; }
 
 /* Repères dans la partition */

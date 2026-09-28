@@ -9,6 +9,7 @@ import {
   newId,
   noteBeats,
   type Accidental,
+  type Articulation,
   type Clef,
   type Duration,
   type Dynamic,
@@ -84,6 +85,7 @@ export interface Saisie {
   pitches: Pitch[];
   duration: Duration;
   dotted: boolean;
+  triolet?: boolean;
 }
 
 /**
@@ -120,6 +122,7 @@ export function inserer(etat: Etat, saisie: Saisie): Resultat {
     pitches: saisie.pitches,
     duration: saisie.duration,
     dotted: saisie.dotted,
+    ...(saisie.triolet ? { triolet: true } : {}),
   };
   const notes = score.measures[mesure][cle].slice();
   notes.splice(index, 0, note);
@@ -152,7 +155,7 @@ export function changerDuree(etat: Etat, id: string, duration: Duration, dotted:
   if (!p) return etat;
   const note = etat.score.measures[p.mesure][p.cle][p.index];
   const capacite = measureCapacity(etat.score.timeSig);
-  const rempli = remplissage(etat.score, p.mesure, p.cle) - noteBeats(note) + noteBeats({ duration, dotted });
+  const rempli = remplissage(etat.score, p.mesure, p.cle) - noteBeats(note) + noteBeats({ duration, dotted, triolet: note.triolet });
   if (rempli > capacite + EPS) return "Avec cette durée, la note ne tient plus dans la mesure.";
   return { ...etat, score: modifierNote(etat.score, id, (n) => ({ ...n, duration, dotted })) };
 }
@@ -299,6 +302,28 @@ export function soufflet(etat: Etat, id: string, form: "cres" | "dim"): Resultat
   return { ...etat, score: modifierNote(etat.score, id, (n) => ({ ...n, hairpin: { form, end: suiv.id } })) };
 }
 
+/** Fait d'une note une note de triolet (2/3 de sa durée), ou l'inverse si elle tient encore. */
+export function basculerTriolet(etat: Etat, id: string): Resultat {
+  const p = trouver(etat.score, id);
+  if (!p) return etat;
+  const note = etat.score.measures[p.mesure][p.cle][p.index];
+  const triolet = !note.triolet;
+  const rempli = remplissage(etat.score, p.mesure, p.cle) - noteBeats(note) + noteBeats({ ...note, triolet });
+  if (rempli > measureCapacity(etat.score.timeSig) + EPS) return "Sans triolet, la note ne tient plus dans la mesure.";
+  return { ...etat, score: modifierNote(etat.score, id, ({ triolet: _t, ...n }) => (triolet ? { ...n, triolet } : n)) };
+}
+
+/** Met ou retire une articulation. */
+export function articuler(etat: Etat, id: string, a: Articulation): Resultat {
+  return {
+    ...etat,
+    score: modifierNote(etat.score, id, ({ articulations = [], ...n }) => {
+      const suite = articulations.includes(a) ? articulations.filter((x) => x !== a) : [...articulations, a];
+      return suite.length ? { ...n, articulations: suite } : n;
+    }),
+  };
+}
+
 /** Retire nuance et soufflet de la note. */
 export function sansNuance(etat: Etat, id: string): Resultat {
   return { ...etat, score: modifierNote(etat.score, id, ({ dynamic: _d, hairpin: _h, ...n }) => n) };
@@ -362,11 +387,12 @@ function hauteur(p: Pitch): number {
   return p.octave * 7 + LETTERS.indexOf(p.letter);
 }
 
-/** « 1 temps », « 1 temps ½ », « ½ temps »… (en noires). */
+/** « 1 temps », « 1 ½ temps », « ⅓ temps »… (en noires ; les triolets donnent des tiers). */
 export function formatTemps(beats: number): string {
-  const entier = Math.floor(beats + EPS);
+  const entier = Math.floor(beats + 1e-6);
   const reste = beats - entier;
-  const fraction = reste > EPS ? ({ 0.25: "¼", 0.5: "½", 0.75: "¾" } as Record<number, string>)[Math.round(reste * 4) / 4] ?? "" : "";
+  const fractions: [number, string][] = [[0.25, "¼"], [1 / 3, "⅓"], [0.5, "½"], [2 / 3, "⅔"], [0.75, "¾"]];
+  const fraction = reste < 1e-6 ? "" : (fractions.find(([v]) => Math.abs(v - reste) < 0.01)?.[1] ?? reste.toFixed(2).replace(".", ","));
   if (!entier) return fraction ? `${fraction} temps` : "0 temps";
   return `${entier}${fraction ? " " + fraction : ""} temps`;
 }

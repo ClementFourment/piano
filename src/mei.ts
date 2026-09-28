@@ -5,8 +5,8 @@
 //   qui valent jusqu'à la fin de la mesure, à la même octave ;
 // - les croches et doubles croches sont ligaturées par temps.
 
-import { KEY_SIGNATURES, measureCapacity, noteBeats, type Accidental, type Duration, type Note, type Score } from "../shared/score";
-import { groupesLigature, notesSuivantes, suiviAlterations, tetesLiees } from "./solfege";
+import { KEY_SIGNATURES, measureCapacity, noteBeats, type Accidental, type Articulation, type Duration, type Note, type Score } from "../shared/score";
+import { notesSuivantes, segments, suiviAlterations, tetesLiees } from "./solfege";
 
 const DUR: Record<Duration, string> = { whole: "1", half: "2", quarter: "4", eighth: "8", sixteenth: "16" };
 const ACCID: Record<NonNullable<Accidental>, string> = { sharp: "s", flat: "f", natural: "n" };
@@ -35,26 +35,40 @@ function layer(notes: Note[], score: Score): string {
   const alteration = suiviAlterations(score.keySignature);
   const element = (n: Note): string => {
     if (n.rest) return `<rest xml:id="${n.id}" ${durAttrs(n)}/>`;
+    const artic = articulation(n);
     const tetes = n.pitches.map((p, i) => {
       const alter = alteration(p);
       const ges = alter === 1 ? "s" : alter === -1 ? "f" : "n";
       const id = n.pitches.length > 1 ? `${n.id}${CHORD_SEP}${i}` : n.id;
       const accid = p.accidental ? ` accid="${ACCID[p.accidental]}"` : "";
       const dur = n.pitches.length > 1 ? "" : ` ${durAttrs(n)}`;
-      return `<note xml:id="${id}"${dur} pname="${p.letter.toLowerCase()}" oct="${p.octave}"${accid} accid.ges="${ges}"/>`;
+      const debut = `<note xml:id="${id}"${dur} pname="${p.letter.toLowerCase()}" oct="${p.octave}"${accid} accid.ges="${ges}"`;
+      // Note seule : l'articulation va dans la note ; accord : dans l'accord.
+      return artic && n.pitches.length === 1 ? `${debut}>${artic}</note>` : `${debut}/>`;
     });
-    return n.pitches.length > 1 ? `<chord xml:id="${n.id}" ${durAttrs(n)}>${tetes.join("")}</chord>` : tetes[0];
+    return n.pitches.length > 1 ? `<chord xml:id="${n.id}" ${durAttrs(n)}>${artic}${tetes.join("")}</chord>` : tetes[0];
   };
 
-  const groupes = groupesLigature(notes, score.timeSig);
   let out = "";
-  notes.forEach((n, i) => {
-    const g = groupes[i];
-    if (g && g[0] === n) out += "<beam>";
-    out += element(n);
-    if (g && g[g.length - 1] === n) out += "</beam>";
-  });
+  for (const seg of segments(notes, score.timeSig)) {
+    if (seg.triolet) out += `<tuplet num="3" numbase="2" num.visible="true" bracket.visible="${seg.ligatures.every(Boolean) ? "false" : "true"}">`;
+    seg.notes.forEach((n, i) => {
+      const g = seg.ligatures[i];
+      if (g && g[0] === n) out += "<beam>";
+      out += element(n);
+      if (g && g[g.length - 1] === n) out += "</beam>";
+    });
+    if (seg.triolet) out += "</tuplet>";
+  }
   return out;
+}
+
+const ARTIC: Partial<Record<Articulation, string>> = { staccato: "stacc", accent: "acc", tenuto: "ten", marcato: "marc" };
+
+/** Élément <artic> (le point d'orgue est à part : c'est un élément de contrôle). */
+function articulation(n: Note): string {
+  const valeurs = (n.articulations ?? []).map((a) => ARTIC[a]).filter(Boolean);
+  return valeurs.length ? `<artic artic="${valeurs.join(" ")}"/>` : "";
 }
 
 export function scoreToMei(score: Score): string {
@@ -76,6 +90,9 @@ export function scoreToMei(score: Score): string {
         for (const [i, j] of tetesLiees(n, suiv)) xml += `<tie startid="#${tete(n, i)}" endid="#${tete(suiv!, j)}"/>`;
         if (n.slurEnd && ids.has(n.slurEnd)) xml += `<slur staff="${staff}" startid="#${n.id}" endid="#${n.slurEnd}"/>`;
         if (n.dynamic) xml += `<dynam staff="${staff}" place="below" startid="#${n.id}">${n.dynamic}</dynam>`;
+        if (n.articulations?.includes("fermata")) {
+          xml += `<fermata staff="${staff}" place="${staff === 1 ? "above" : "below"}" startid="#${n.id}"/>`;
+        }
         if (n.hairpin && ids.has(n.hairpin.end)) {
           xml += `<hairpin form="${n.hairpin.form}" staff="${staff}" place="below" startid="#${n.id}" endid="#${n.hairpin.end}"/>`;
         }

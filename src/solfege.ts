@@ -43,15 +43,16 @@ function groupeLigature(timeSig: Score["timeSig"]): number {
 const LIGATURABLE: Partial<Record<Duration, true>> = { eighth: true, sixteenth: true };
 
 /**
- * Découpe une portée en groupes de ligature : notes consécutives de moins d'une noire
- * (hors silences) dans le même temps. Renvoie, pour chaque note, son groupe (null = non ligaturée).
+ * Groupes de ligature d'une suite de notes (hors triolets) commençant à `depart` noires
+ * du début de la mesure : notes consécutives de moins d'une noire (hors silences) dans le même temps.
+ * Renvoie, pour chaque note, son groupe (null = non ligaturée).
  */
-export function groupesLigature(notes: Note[], timeSig: Score["timeSig"]): (Note[] | null)[] {
+function groupesLigature(notes: Note[], timeSig: Score["timeSig"], depart: number): (Note[] | null)[] {
   const groupe = groupeLigature(timeSig);
   const res: (Note[] | null)[] = [];
   let courant: Note[] = [];
   let temps = -1;
-  let pos = 0;
+  let pos = depart;
   for (const n of notes) {
     const t = Math.floor(pos / groupe + 1e-9);
     if (!n.rest && LIGATURABLE[n.duration]) {
@@ -68,6 +69,67 @@ export function groupesLigature(notes: Note[], timeSig: Score["timeSig"]): (Note
   }
   // Un groupe d'une seule note n'est pas ligaturé.
   return res.map((g) => (g && g.length > 1 ? g : null));
+}
+
+/** Dans un triolet : toutes les notes brèves consécutives sont ligaturées ensemble. */
+function ligaturesTriolet(notes: Note[]): (Note[] | null)[] {
+  const res: (Note[] | null)[] = [];
+  let courant: Note[] = [];
+  for (const n of notes) {
+    if (!n.rest && LIGATURABLE[n.duration]) {
+      courant.push(n);
+      res.push(courant);
+    } else {
+      courant = [];
+      res.push(null);
+    }
+  }
+  return res.map((g) => (g && g.length > 1 ? g : null));
+}
+
+export interface Segment {
+  /** Groupe de triolet (3 dans le temps de 2), sinon suite de notes normales. */
+  triolet: boolean;
+  notes: Note[];
+  /** Pour chaque note du segment, son groupe de ligature (null = non ligaturée). */
+  ligatures: (Note[] | null)[];
+}
+
+const EPS = 1e-9;
+
+/**
+ * Découpe une portée d'une mesure en segments : notes normales et groupes de triolet.
+ * Un groupe de triolet se ferme quand il remplit le temps de deux de ses plus petites valeurs
+ * (3 croches = 1 noire, noire + croche = 1 noire, 3 noires = 1 blanche…).
+ */
+export function segments(notes: Note[], timeSig: Score["timeSig"]): Segment[] {
+  const res: Segment[] = [];
+  let i = 0;
+  let pos = 0;
+  while (i < notes.length) {
+    const debut = pos;
+    const groupe: Note[] = [];
+    if (notes[i].triolet) {
+      let rempli = 0;
+      let plusPetite = Infinity;
+      while (i < notes.length && notes[i].triolet) {
+        const n = notes[i++];
+        groupe.push(n);
+        rempli += noteBeats(n);
+        plusPetite = Math.min(plusPetite, noteBeats({ ...n, triolet: false }));
+        if (rempli >= 2 * plusPetite - EPS) break;
+      }
+      pos += rempli;
+      res.push({ triolet: true, notes: groupe, ligatures: ligaturesTriolet(groupe) });
+    } else {
+      while (i < notes.length && !notes[i].triolet) {
+        groupe.push(notes[i]);
+        pos += noteBeats(notes[i++]);
+      }
+      res.push({ triolet: false, notes: groupe, ligatures: groupesLigature(groupe, timeSig, debut) });
+    }
+  }
+  return res;
 }
 
 /** Pour chaque note, la note qui la suit sur la même portée (en passant les barres de mesure). */
