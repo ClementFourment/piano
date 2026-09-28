@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ScoreDoc, User } from "../shared/api";
 import { api, ApiError } from "./api";
+import { Editor } from "./components/Editor";
 import { Library } from "./components/Library";
 import { LoginPage } from "./components/LoginPage";
 import { ScoreView } from "./components/ScoreView";
@@ -56,6 +57,7 @@ function OwnScore({ id, onBack }: { id: string; onBack: () => void }) {
   }, [id]);
   if (erreur) return <Erreur message={erreur} lien={{ texte: "← Bibliothèque", onClick: onBack }} />;
   if (!doc) return <p className="muted center pad">Chargement…</p>;
+  if (doc.kind === "score") return <Editor doc={doc} onBack={onBack} onChange={setDoc} />;
   return <ScoreView doc={doc} onBack={onBack} onChange={setDoc} />;
 }
 

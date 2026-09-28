@@ -15,7 +15,14 @@ Tout tourne sur l'offre gratuite de Cloudflare, sans carte bancaire.
 
 - Partition éditable : JSON (`shared/score.ts`), convertie en MEI pour l'affichage (`src/mei.ts`).
 - Fichiers importés (MusicXML, .mxl, MEI) : convertis en MEI par Verovio, en lecture seule.
-- Exports : PDF (impression), MIDI, MEI, JSON.
+- Exports : PDF (impression), MusicXML (partitions éditables, `src/musicxml.ts`), MIDI, MEI, JSON.
+
+## Éditeur
+
+Palette à gauche (`src/components/Palette.tsx`), opérations d'édition pures dans `src/editor/model.ts`
+(annuler/rétablir = pile d'états), règles communes au rendu et à l'export dans `src/solfege.ts`.
+Enregistrement automatique 1,2 s après la dernière modification. Raccourcis clavier façon MuseScore
+(liste dans la palette).
 
 ## Développement
 

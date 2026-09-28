@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ScoreMeta, User } from "../../shared/api";
+import { emptyScore } from "../../shared/score";
 import { api } from "../api";
 import { EXTENSIONS_IMPORT, importerFichier } from "../fichiers";
 
@@ -44,6 +45,19 @@ export function Library({ user, onOpen, onLogout }: Props) {
     }
   }
 
+  async function creer() {
+    setBusy(true);
+    setError("");
+    try {
+      const nom = [user.firstname, user.lastname].filter(Boolean).join(" ");
+      const doc = await api.create("score", JSON.stringify(emptyScore(nom)));
+      onOpen(doc.id);
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  }
+
   async function supprimer(id: string) {
     try {
       await api.remove(id);
@@ -71,8 +85,11 @@ export function Library({ user, onOpen, onLogout }: Props) {
         <div className="library-actions">
           <h2>Mes partitions</h2>
           <div className="spacer" />
-          <button className="btn primary" onClick={() => fileRef.current?.click()} disabled={busy}>
-            {busy ? "Import…" : "⭱ Importer un fichier"}
+          <button className="btn" onClick={() => fileRef.current?.click()} disabled={busy}>
+            ⭱ Importer un fichier
+          </button>
+          <button className="btn primary" onClick={creer} disabled={busy}>
+            ＋ Nouvelle partition
           </button>
           <input
             ref={fileRef}
@@ -101,7 +118,7 @@ export function Library({ user, onOpen, onLogout }: Props) {
         {scores?.length === 0 && (
           <div className="empty">
             <p>Aucune partition pour l'instant.</p>
-            <p className="muted small">Importez un fichier pour commencer.</p>
+            <p className="muted small">Créez une nouvelle partition, ou importez un fichier.</p>
           </div>
         )}
 
