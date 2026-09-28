@@ -43,6 +43,8 @@ export interface Note {
   /** Note de triolet : dure les 2/3 de sa valeur écrite (3 notes dans le temps de 2). */
   triolet?: boolean;
   articulations?: Articulation[];
+  /** Accord arpégé : notes égrenées du grave vers l'aigu. */
+  arpege?: boolean;
   /** Liaison de prolongation vers la note suivante de la même portée (hauteurs communes). */
   tie?: boolean;
   /** Liaison de phrasé : identifiant de la dernière note liée (même portée, plus loin). */
@@ -151,6 +153,7 @@ function lireNote(n: unknown): Note | null {
   }
   if (n.rest === true) return { ...base, rest: true, pitches: [] };
   if (n.tie === true) base.tie = true;
+  if (n.arpege === true) base.arpege = true;
   if (estId(n.slurEnd)) base.slurEnd = n.slurEnd;
   const brutes = Array.isArray(n.pitches) ? n.pitches : [n];
   if (brutes.length === 0 || brutes.length > LIMITES.hauteursParAccord) return null;

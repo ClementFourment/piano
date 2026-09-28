@@ -324,6 +324,14 @@ export function articuler(etat: Etat, id: string, a: Articulation): Resultat {
   };
 }
 
+/** Accord arpégé ou non. */
+export function basculerArpege(etat: Etat, id: string): Resultat {
+  const note = trouverNote(etat.score, id);
+  if (!note) return etat;
+  if (note.rest || note.pitches.length < 2) return "L'arpège ne s'applique qu'à un accord (au moins deux notes).";
+  return { ...etat, score: modifierNote(etat.score, id, ({ arpege, ...n }) => (arpege ? n : { ...n, arpege: true })) };
+}
+
 /** Retire nuance et soufflet de la note. */
 export function sansNuance(etat: Etat, id: string): Resultat {
   return { ...etat, score: modifierNote(etat.score, id, ({ dynamic: _d, hairpin: _h, ...n }) => n) };

@@ -90,6 +90,7 @@ export function scoreToMei(score: Score): string {
         for (const [i, j] of tetesLiees(n, suiv)) xml += `<tie startid="#${tete(n, i)}" endid="#${tete(suiv!, j)}"/>`;
         if (n.slurEnd && ids.has(n.slurEnd)) xml += `<slur staff="${staff}" startid="#${n.id}" endid="#${n.slurEnd}"/>`;
         if (n.dynamic) xml += `<dynam staff="${staff}" place="below" startid="#${n.id}">${n.dynamic}</dynam>`;
+        if (n.arpege && n.pitches.length > 1) xml += `<arpeg staff="${staff}" startid="#${n.id}"/>`;
         if (n.articulations?.includes("fermata")) {
           xml += `<fermata staff="${staff}" place="${staff === 1 ? "above" : "below"}" startid="#${n.id}"/>`;
         }

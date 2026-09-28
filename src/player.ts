@@ -63,6 +63,7 @@ export async function jouer(tk: VerovioToolkit, conteneur: HTMLElement, opts: Op
       }
       const artic = expr.articulation(id);
       const velocity = Math.max(1, Math.min(127, expr.velocite(time) + artic.bonus));
+      // (Les accords arpégés sont déjà égrenés par Verovio dans la timemap.)
       piano.start({ note: pitch, time: t0 + e.t, duration: (total * artic.duree) / 1000, velocity });
     }
   }

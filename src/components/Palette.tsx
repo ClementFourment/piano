@@ -71,6 +71,8 @@ export interface PaletteProps {
   /** Articulations de la note visée. */
   articulations: Articulation[];
   onArticulation: (a: Articulation) => void;
+  arpege: boolean;
+  onArpege: () => void;
   onAlteration: (a: NonNullable<Accidental>) => void;
   onNote: (l: Letter) => void;
   onModeAccord: (v: boolean) => void;
@@ -214,6 +216,15 @@ export function Palette(p: PaletteProps) {
               {a.glyphe}
             </button>
           ))}
+          <button
+            className={`dyn-btn artic${p.arpege ? " active" : ""}`}
+            onClick={p.onArpege}
+            aria-pressed={p.arpege}
+            title="Arpège : notes de l'accord égrenées du grave vers l'aigu"
+            aria-label="Arpège"
+          >
+            ⌇
+          </button>
         </div>
       </section>
 

@@ -399,6 +399,8 @@ export function Editor({ doc, onBack, onChange }: Props) {
               onTriolet={basculerTriolet}
               articulations={M.cible(etat)?.articulations ?? []}
               onArticulation={(a) => surCible((id) => M.articuler(etat, id, a))}
+              arpege={!!M.cible(etat)?.arpege}
+              onArpege={() => surCible((id) => M.basculerArpege(etat, id))}
               alteration={alteration}
               modeAccord={modeAccord}
               selection={selection !== null}

@@ -280,7 +280,7 @@ input {
 .dyn-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
 .dyn-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 .checks { display: flex; gap: 1rem; }
-.artic-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.3rem; }
+.artic-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.3rem; }
 .dyn-btn.artic { font-style: normal; font-size: 16px; }
 .soufflet { font-size: 15px; font-weight: 400; transform: scaleX(1.6); display: inline-block; margin-right: 0.2rem; }
 

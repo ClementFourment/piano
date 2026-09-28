@@ -129,6 +129,8 @@ function portee(notes: Note[], score: Score, staff: 1 | 2, ctx: Contexte): { xml
         const depart = liees.has(i);
         const ties = (arrivee ? '<tie type="stop"/>' : "") + (depart ? '<tie type="start"/>' : "");
         let notations = (arrivee ? '<tied type="stop"/>' : "") + (depart ? '<tied type="start"/>' : "");
+        // L'arpège se note sur chaque note de l'accord.
+        if (n.arpege && n.pitches.length > 1) notations += "<arpeggiate/>";
         if (i === 0) {
           notations += marqueTriolet + articulationsXml(n);
           const finLiaison = ctx.finsDeLiaison.get(n.id);
