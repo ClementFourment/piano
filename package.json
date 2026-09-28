@@ -1,0 +1,32 @@
+{
+  "name": "piano",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "check": "tsc -b",
+    "deploy": "vite build && wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply piano --local",
+    "db:migrate:remote": "wrangler d1 migrations apply piano --remote",
+    "user:add": "node scripts/add-user.mjs"
+  },
+  "type": "module",
+  "dependencies": {
+    "hono": "^4.13.10",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "smplr": "^1.0.0",
+    "verovio": "^6.3.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.61.0",
+    "@cloudflare/workers-types": "^5.20260928.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1",
+    "wrangler": "^4.142.0"
+  },
+  "private": true
+}
