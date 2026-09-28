@@ -16,7 +16,6 @@
       "migrations_dir": "migrations"
     }
   ],
-  // Adresse de test tant que piano.clementfourment.fr sert encore l'ancien éditeur.
-  "workers_dev": true,
+  "routes": [{ "pattern": "piano.clementfourment.fr", "custom_domain": true }],
   "observability": { "enabled": true }
 }
