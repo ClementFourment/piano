@@ -1,7 +1,7 @@
 // Palette d'outils de l'éditeur (colonne de gauche), reprise du prototype.
 
 import { useEffect, useState } from "react";
-import { DOIGTS, DYNAMICS, KEY_SIGNATURES, type Doigt, type Accidental, type Articulation, type Barre, type Clef, type Duration, type Dynamic, type KeySignature, type Letter } from "../../shared/score";
+import { DOIGTS, DYNAMICS, KEY_SIGNATURES, type Doigt, type Accidental, type Articulation, type Barre, type Clef, type Duration, type Dynamic, type KeySignature, type Letter, type Voix } from "../../shared/score";
 
 export const NOMS_NOTES: Record<Letter, string> = { C: "Do", D: "Ré", E: "Mi", F: "Fa", G: "Sol", A: "La", B: "Si" };
 
@@ -48,6 +48,8 @@ function signeArmure(k: KeySignature): string {
 
 export interface PaletteProps {
   cle: Clef;
+  voix: Voix;
+  onVoix: (v: Voix) => void;
   octave: number;
   duree: Duration;
   pointee: boolean;
@@ -135,6 +137,17 @@ export function Palette(p: PaletteProps) {
             Main gauche (fa)
           </button>
         </div>
+        <div className="seg espace-seg" role="group" aria-label="Voix">
+          <button className={p.voix === 1 ? "active" : ""} onClick={() => p.onVoix(1)} title="Touche V">
+            Voix 1 (hampes en haut)
+          </button>
+          <button className={p.voix === 2 ? "active" : ""} onClick={() => p.onVoix(2)} title="Touche V">
+            Voix 2 (hampes en bas)
+          </button>
+        </div>
+        {p.voix === 2 && (
+          <p className="chord-hint">Voix 2 : des notes jouées en même temps que la voix 1, sur la même portée (ex. une ronde tenue sous des noires).</p>
+        )}
         <div className="octave-row">
           <span className="small muted">Octave</span>
           <div className="stepper">
@@ -421,6 +434,7 @@ export function Palette(p: PaletteProps) {
             <dt>↑ ↓</dt><dd>monter/descendre la note (Ctrl : octave)</dd>
             <dt>← →</dt><dd>note précédente / suivante</dd>
             <dt>Tab</dt><dd>changer de portée</dd>
+            <dt>V</dt><dd>voix 1 / voix 2</dd>
             <dt>T</dt><dd>triolet</dd>
             <dt>S</dt><dd>staccato</dd>
             <dt>Alt + 1 à 5</dt><dd>doigté</dd>

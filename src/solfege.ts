@@ -1,6 +1,6 @@
 // Règles de solfège partagées par le rendu (MEI) et l'export (MusicXML).
 
-import { KEY_SIGNATURES, noteBeats, type Accidental, type Duration, type KeySignature, type Letter, type Note, type Pitch, type Score } from "../shared/score";
+import { KEY_SIGNATURES, PORTEES, aDeuxVoix, cleDe, notesDe, noteBeats, voixDe, type Accidental, type Duration, type KeySignature, type Letter, type Note, type Pitch, type Score } from "../shared/score";
 
 const ALTER: Record<NonNullable<Accidental>, number> = { sharp: 1, flat: -1, natural: 0 };
 const ORDRE_DIESES: Letter[] = ["F", "C", "G", "D", "A", "E", "B"];
@@ -132,13 +132,13 @@ export function segments(notes: Note[], timeSig: Score["timeSig"]): Segment[] {
   return res;
 }
 
-/** Pour chaque note, la note qui la suit sur la même portée (en passant les barres de mesure). */
+/** Pour chaque note, la note qui la suit sur la même portée et dans la même voix (en passant les barres de mesure). */
 export function notesSuivantes(score: Score): Map<string, Note> {
   const suivantes = new Map<string, Note>();
-  for (const cle of ["treble", "bass"] as const) {
+  for (const cle of PORTEES) {
     let prec: Note | null = null;
     for (const m of score.measures) {
-      for (const n of m[cle]) {
+      for (const n of notesDe(m, cle)) {
         if (prec) suivantes.set(prec.id, n);
         prec = n;
       }
@@ -170,6 +170,7 @@ const degre = (p: Pitch) => p.octave * 7 + "CDEFGAB".indexOf(p.letter);
  * Sens de la hampe de chaque note (règle de gravure classique) : la note la plus
  * éloignée de la ligne du milieu décide ; à égalité, hampe en bas. Toutes les notes
  * d'un groupe ligaturé partagent le même sens. Les silences n'en ont pas.
+ * Quand une portée a deux voix dans la mesure : voix 1 en haut, voix 2 en bas.
  */
 export function sensHampes(score: Score): Map<string, Sens> {
   const sens = new Map<string, Sens>();
@@ -177,13 +178,14 @@ export function sensHampes(score: Score): Map<string, Sens> {
     const degres = notes.flatMap((n) => n.pitches.map(degre));
     return milieu - Math.min(...degres) > Math.max(...degres) - milieu ? "up" : "down";
   };
-  for (const cle of ["treble", "bass"] as const) {
+  for (const cle of PORTEES) {
     for (const m of score.measures) {
-      for (const seg of segments(m[cle], score.timeSig)) {
+      const impose: Sens | null = aDeuxVoix(m, cleDe(cle)) ? (voixDe(cle) === 1 ? "up" : "down") : null;
+      for (const seg of segments(notesDe(m, cle), score.timeSig)) {
         seg.notes.forEach((n, i) => {
           if (n.rest || sens.has(n.id)) return;
           const groupe = seg.ligatures[i] ?? [n];
-          const s = decider(groupe, MILIEU[cle]);
+          const s = impose ?? decider(groupe, MILIEU[cleDe(cle)]);
           for (const g of groupe) sens.set(g.id, s);
         });
       }
@@ -194,6 +196,25 @@ export function sensHampes(score: Score): Map<string, Sens> {
 
 /** Côté des têtes de notes : à l'opposé de la hampe (doigtés, liaisons). */
 export const coteTetes = (s: Sens | undefined): "above" | "below" => (s === "up" ? "below" : "above");
+
+/** Notes des mesures où leur portée a deux voix. */
+export function notesADeuxVoix(score: Score): Set<string> {
+  const ids = new Set<string>();
+  for (const m of score.measures) {
+    for (const p of PORTEES) if (aDeuxVoix(m, cleDe(p))) for (const n of notesDe(m, p)) ids.add(n.id);
+  }
+  return ids;
+}
+
+/**
+ * Côté des indications d'une note (doigtés) : côté des têtes avec une seule voix ;
+ * avec deux voix, à l'extérieur (voix 1 au-dessus, voix 2 en dessous), pour ne pas
+ * mélanger les indications des deux voix entre elles.
+ */
+export function coteIndications(id: string, sens: Map<string, Sens>, deuxVoix: Set<string>): "above" | "below" {
+  const s = sens.get(id);
+  return deuxVoix.has(id) ? (s === "down" ? "below" : "above") : coteTetes(s);
+}
 
 /** Longueur d'une hampe, en degrés (trois espaces et demi). */
 const HAMPE = 7;
@@ -208,16 +229,22 @@ const SEUIL_DEGAGEMENT = 5;
  */
 export function cotesLiaisons(score: Score, sens: Map<string, Sens>): Map<string, "above" | "below"> {
   const cotes = new Map<string, "above" | "below">();
+  const deuxVoix = notesADeuxVoix(score);
   const haut = (n: Note) => Math.max(...n.pitches.map(degre)) + (sens.get(n.id) === "up" && n.duration !== "whole" ? HAMPE : 0);
   const bas = (n: Note) => Math.min(...n.pitches.map(degre)) - (sens.get(n.id) === "down" && n.duration !== "whole" ? HAMPE : 0);
 
-  for (const cle of ["treble", "bass"] as const) {
-    const notes = score.measures.flatMap((m) => m[cle]);
+  for (const cle of PORTEES) {
+    const notes = score.measures.flatMap((m) => notesDe(m, cle));
     notes.forEach((n, i) => {
       if (!n.slurEnd) return;
       const fin = notes.findIndex((x) => x.id === n.slurEnd);
       if (fin <= i) return;
       const tranche = notes.slice(i, fin + 1);
+      // Avec deux voix, la liaison va à l'extérieur, comme les autres indications de la voix.
+      if (tranche.some((x) => deuxVoix.has(x.id))) {
+        cotes.set(n.id, coteIndications(n.id, sens, deuxVoix));
+        return;
+      }
       const directions = new Set(tranche.map((x) => sens.get(x.id)).filter(Boolean));
       const classique = directions.size === 1 ? coteTetes([...directions][0]) : "above";
 

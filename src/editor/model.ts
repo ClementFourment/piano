@@ -10,8 +10,11 @@ import {
   noteBeats,
   type Accidental,
   type Articulation,
-  type Clef,
+  PORTEES,
+  notesDe,
+  toutesNotes,
   type Doigt,
+  type Portee,
   type Duration,
   type Dynamic,
   type Measure,
@@ -20,10 +23,10 @@ import {
   type Score,
 } from "../../shared/score";
 
-/** Point d'insertion : avant la note n° `index` de la portée `cle` de la mesure `mesure`. */
+/** Point d'insertion : avant la note n° `index` de la portée (et voix) `cle` de la mesure `mesure`. */
 export interface Curseur {
   mesure: number;
-  cle: Clef;
+  cle: Portee;
   index: number;
 }
 
@@ -38,14 +41,15 @@ export type Resultat = Etat | string;
 
 const EPS = 1e-9;
 
-export function remplissage(score: Score, mesure: number, cle: Clef): number {
-  return score.measures[mesure]?.[cle].reduce((s, n) => s + noteBeats(n), 0) ?? 0;
+export function remplissage(score: Score, mesure: number, cle: Portee): number {
+  const m = score.measures[mesure];
+  return m ? notesDe(m, cle).reduce((s, n) => s + noteBeats(n), 0) : 0;
 }
 
-export function trouver(score: Score, id: string): { mesure: number; cle: Clef; index: number } | null {
+export function trouver(score: Score, id: string): { mesure: number; cle: Portee; index: number } | null {
   for (let m = 0; m < score.measures.length; m++) {
-    for (const cle of ["treble", "bass"] as const) {
-      const index = score.measures[m][cle].findIndex((n) => n.id === id);
+    for (const cle of PORTEES) {
+      const index = notesDe(score.measures[m], cle).findIndex((n) => n.id === id);
       if (index >= 0) return { mesure: m, cle, index };
     }
   }
@@ -56,27 +60,34 @@ export function trouver(score: Score, id: string): { mesure: number; cle: Clef; 
 export function cible(etat: Etat): Note | null {
   if (etat.selection) {
     const p = trouver(etat.score, etat.selection);
-    return p ? etat.score.measures[p.mesure][p.cle][p.index] : null;
+    return p ? notesDe(etat.score.measures[p.mesure], p.cle)[p.index] : null;
   }
   const { mesure, cle, index } = etat.curseur;
-  return etat.score.measures[mesure]?.[cle][index - 1] ?? null;
+  const m = etat.score.measures[mesure];
+  return (m && notesDe(m, cle)[index - 1]) ?? null;
 }
 
 /** Copie la partition et applique `fn` à la note `id`. */
 function modifierNote(score: Score, id: string, fn: (n: Note) => Note): Score {
   return {
     ...score,
-    measures: score.measures.map((m) => ({
-      ...m,
-      treble: m.treble.map((n) => (n.id === id ? fn(n) : n)),
-      bass: m.bass.map((n) => (n.id === id ? fn(n) : n)),
-    })),
+    measures: score.measures.map((m) => avecNotes(m, (n) => (n.id === id ? fn(n) : n))),
   };
 }
 
-function avecPortee(score: Score, mesure: number, cle: Clef, notes: Note[]): Score {
+/** Copie de la mesure où chaque note (toutes portées et voix) passe par `fn`. */
+function avecNotes(m: Measure, fn: (n: Note) => Note): Measure {
+  const copie: Measure = { ...m };
+  for (const p of PORTEES) if (m[p]) copie[p] = m[p]!.map(fn);
+  return copie;
+}
+
+/** Remplace les notes d'une portée ; une voix 2 vidée disparaît. */
+function avecPortee(score: Score, mesure: number, cle: Portee, notes: Note[]): Score {
   const measures = score.measures.slice();
-  measures[mesure] = { ...measures[mesure], [cle]: notes };
+  const m: Measure = { ...measures[mesure], [cle]: notes };
+  if ((cle === "treble2" || cle === "bass2") && notes.length === 0) delete m[cle];
+  measures[mesure] = m;
   return { ...score, measures };
 }
 
@@ -104,7 +115,7 @@ export function inserer(etat: Etat, saisie: Saisie): Resultat {
   let rempli = remplissage(score, mesure, cle);
   if (rempli + duree > capacite + EPS) {
     // On n'avance que si le curseur est en fin de mesure pleine.
-    const finDeMesure = index === score.measures[mesure][cle].length;
+    const finDeMesure = index === notesDe(score.measures[mesure], cle).length;
     if (!finDeMesure || rempli < capacite - EPS) {
       const reste = capacite - rempli;
       return reste > EPS
@@ -126,7 +137,7 @@ export function inserer(etat: Etat, saisie: Saisie): Resultat {
     dotted: saisie.dotted,
     ...(saisie.triolet ? { triolet: true } : {}),
   };
-  const notes = score.measures[mesure][cle].slice();
+  const notes = notesDe(score.measures[mesure], cle).slice();
   notes.splice(index, 0, note);
   return { score: avecPortee(score, mesure, cle, notes), curseur: { mesure, cle, index: index + 1 }, selection: null };
 }
@@ -155,7 +166,7 @@ export function enSilence(etat: Etat, id: string): Resultat {
 export function changerDuree(etat: Etat, id: string, duration: Duration, dotted: boolean): Resultat {
   const p = trouver(etat.score, id);
   if (!p) return etat;
-  const note = etat.score.measures[p.mesure][p.cle][p.index];
+  const note = notesDe(etat.score.measures[p.mesure], p.cle)[p.index];
   const capacite = measureCapacity(etat.score.timeSig);
   const rempli = remplissage(etat.score, p.mesure, p.cle) - noteBeats(note) + noteBeats({ duration, dotted, triolet: note.triolet });
   if (rempli > capacite + EPS) return "Avec cette durée, la note ne tient plus dans la mesure.";
@@ -197,7 +208,7 @@ export function transposer(etat: Etat, id: string, pas: number): Resultat {
 export function supprimer(etat: Etat, id: string): Resultat {
   const p = trouver(etat.score, id);
   if (!p) return etat;
-  const notes = etat.score.measures[p.mesure][p.cle].filter((n) => n.id !== id);
+  const notes = notesDe(etat.score.measures[p.mesure], p.cle).filter((n) => n.id !== id);
   return {
     score: sansReferencesA(avecPortee(etat.score, p.mesure, p.cle, notes), id),
     curseur: { mesure: p.mesure, cle: p.cle, index: p.index },
@@ -208,9 +219,9 @@ export function supprimer(etat: Etat, id: string): Resultat {
 /** Retour arrière : supprime la note avant le curseur (ou remonte à la mesure précédente). */
 export function supprimerAvant(etat: Etat): Resultat {
   const { mesure, cle, index } = etat.curseur;
-  if (index > 0) return supprimer(etat, etat.score.measures[mesure][cle][index - 1].id);
+  if (index > 0) return supprimer(etat, notesDe(etat.score.measures[mesure], cle)[index - 1].id);
   if (mesure === 0) return etat;
-  const prec = etat.score.measures[mesure - 1][cle];
+  const prec = notesDe(etat.score.measures[mesure - 1], cle);
   return { ...etat, curseur: { mesure: mesure - 1, cle, index: prec.length } };
 }
 
@@ -220,7 +231,7 @@ export function naviguer(etat: Etat, dir: -1 | 1): Etat {
   // Toutes les positions de la portée, à la suite.
   const cle = etat.selection ? (trouver(score, etat.selection)?.cle ?? etat.curseur.cle) : etat.curseur.cle;
   const suite: { mesure: number; index: number; id: string }[] = [];
-  score.measures.forEach((m, mi) => m[cle].forEach((n, i) => suite.push({ mesure: mi, index: i, id: n.id })));
+  score.measures.forEach((m, mi) => notesDe(m, cle).forEach((n, i) => suite.push({ mesure: mi, index: i, id: n.id })));
 
   let pos: number;
   if (etat.selection) {
@@ -235,7 +246,7 @@ export function naviguer(etat: Etat, dir: -1 | 1): Etat {
   if (pos >= suite.length) {
     // Au-delà de la dernière note : curseur en fin de partition.
     const derniere = score.measures.length - 1;
-    return { ...etat, selection: null, curseur: { mesure: derniere, cle, index: score.measures[derniere][cle].length } };
+    return { ...etat, selection: null, curseur: { mesure: derniere, cle, index: notesDe(score.measures[derniere], cle).length } };
   }
   const s = suite[pos];
   return { ...etat, selection: s.id, curseur: { mesure: s.mesure, cle, index: s.index + 1 } };
@@ -248,7 +259,7 @@ export function suivante(score: Score, id: string): Note | null {
   const p = trouver(score, id);
   if (!p) return null;
   for (let m = p.mesure; m < score.measures.length; m++) {
-    const notes = score.measures[m][p.cle];
+    const notes = notesDe(score.measures[m], p.cle);
     const debut = m === p.mesure ? p.index + 1 : 0;
     if (debut < notes.length) return notes[debut];
   }
@@ -308,7 +319,7 @@ export function soufflet(etat: Etat, id: string, form: "cres" | "dim"): Resultat
 export function basculerTriolet(etat: Etat, id: string): Resultat {
   const p = trouver(etat.score, id);
   if (!p) return etat;
-  const note = etat.score.measures[p.mesure][p.cle][p.index];
+  const note = notesDe(etat.score.measures[p.mesure], p.cle)[p.index];
   const triolet = !note.triolet;
   const rempli = remplissage(etat.score, p.mesure, p.cle) - noteBeats(note) + noteBeats({ ...note, triolet });
   if (rempli > measureCapacity(etat.score.timeSig) + EPS) return "Sans triolet, la note ne tient plus dans la mesure.";
@@ -365,7 +376,7 @@ export function sansNuance(etat: Etat, id: string): Resultat {
 
 function trouverNote(score: Score, id: string): Note | null {
   const p = trouver(score, id);
-  return p ? score.measures[p.mesure][p.cle][p.index] : null;
+  return p ? notesDe(score.measures[p.mesure], p.cle)[p.index] : null;
 }
 
 /** Après une suppression : retire les liaisons et soufflets qui aboutissaient à la note. */
@@ -379,7 +390,7 @@ function sansReferencesA(score: Score, id: string): Score {
   };
   return {
     ...score,
-    measures: score.measures.map((m) => ({ ...m, treble: m.treble.map(nettoyer), bass: m.bass.map(nettoyer) })),
+    measures: score.measures.map((m) => avecNotes(m, nettoyer)),
   };
 }
 
@@ -395,12 +406,12 @@ export function supprimerMesure(etat: Etat, mesure: number): Resultat {
   if (etat.score.measures.length <= 1) return "La partition doit garder au moins une mesure.";
   const retiree = etat.score.measures[mesure];
   let score: Score = { ...etat.score, measures: etat.score.measures.filter((_, i) => i !== mesure) };
-  for (const n of [...retiree.treble, ...retiree.bass]) score = sansReferencesA(score, n.id);
+  for (const n of toutesNotes(retiree)) score = sansReferencesA(score, n.id);
   const measures = score.measures;
   const m = Math.min(mesure, measures.length - 1);
   return {
     score,
-    curseur: { mesure: m, cle: etat.curseur.cle, index: measures[m][etat.curseur.cle].length },
+    curseur: { mesure: m, cle: etat.curseur.cle, index: notesDe(measures[m], etat.curseur.cle).length },
     selection: null,
   };
 }
@@ -427,25 +438,25 @@ export function dupliquerMesures(etat: Etat, debut: number, fin: number): Result
   const originales = etat.score.measures.slice(debut, fin + 1);
   if (etat.score.measures.length + originales.length > 2000) return "Trop de mesures (2000 maximum).";
   const nouveaux = new Map<string, string>();
-  for (const m of originales) for (const n of [...m.treble, ...m.bass]) nouveaux.set(n.id, newId());
+  for (const m of originales) for (const n of toutesNotes(m)) nouveaux.set(n.id, newId());
   const copierNote = ({ slurEnd, hairpin, ...n }: Note): Note => {
     const copie: Note = { ...n, id: nouveaux.get(n.id)! };
     if (slurEnd && nouveaux.has(slurEnd)) copie.slurEnd = nouveaux.get(slurEnd);
     if (hairpin && nouveaux.has(hairpin.end)) copie.hairpin = { ...hairpin, end: nouveaux.get(hairpin.end)! };
     return copie;
   };
-  const copies = originales.map((m) => ({ ...m, id: newId(), treble: m.treble.map(copierNote), bass: m.bass.map(copierNote) }));
+  const copies = originales.map((m) => ({ ...avecNotes(m, copierNote), id: newId() }));
   const measures = etat.score.measures.slice();
   measures.splice(fin + 1, 0, ...copies);
   const cle = etat.curseur.cle;
   return {
     score: { ...etat.score, measures },
-    curseur: { mesure: fin + 1, cle, index: measures[fin + 1][cle].length },
+    curseur: { mesure: fin + 1, cle, index: notesDe(measures[fin + 1], cle).length },
     selection: null,
   };
 }
 
-const estVide = (m: Measure) => [...m.treble, ...m.bass].every((n) => n.rest);
+const estVide = (m: Measure) => toutesNotes(m).every((n) => n.rest);
 
 /**
  * Place des mesures enregistrées à partir de la mesure `depuis` : les mesures vides
@@ -468,7 +479,7 @@ export function insererEnregistrement(etat: Etat, enregistrees: Measure[], depui
   const derniere = Math.min(k, measures.length) - 1;
   return {
     score: { ...etat.score, measures },
-    curseur: { mesure: derniere, cle: etat.curseur.cle, index: measures[derniere][etat.curseur.cle].length },
+    curseur: { mesure: derniere, cle: etat.curseur.cle, index: notesDe(measures[derniere], etat.curseur.cle).length },
     selection: null,
   };
 }
@@ -476,7 +487,7 @@ export function insererEnregistrement(etat: Etat, enregistrees: Measure[], depui
 export function changerChiffrage(etat: Etat, num: number, den: number): Resultat {
   const capacite = measureCapacity({ num, den });
   const trop = etat.score.measures.findIndex(
-    (_, i) => remplissage(etat.score, i, "treble") > capacite + EPS || remplissage(etat.score, i, "bass") > capacite + EPS,
+    (_, i) => PORTEES.some((p) => remplissage(etat.score, i, p) > capacite + EPS),
   );
   if (trop >= 0) return `La mesure ${trop + 1} est trop remplie pour ${num}/${den} : raccourcissez-la d'abord.`;
   return { ...etat, score: { ...etat.score, timeSig: { num, den } } };

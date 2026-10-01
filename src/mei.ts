@@ -5,8 +5,8 @@
 //   qui valent jusqu'à la fin de la mesure, à la même octave ;
 // - les croches et doubles croches sont ligaturées par temps.
 
-import { KEY_SIGNATURES, measureCapacity, noteBeats, type Accidental, type Articulation, type Barre, type Duration, type Measure, type Note, type Score } from "../shared/score";
-import { coteTetes, cotesLiaisons, notesSuivantes, segments, sensHampes, suiviAlterations, tetesLiees, type Sens } from "./solfege";
+import { KEY_SIGNATURES, aDeuxVoix, notesDe, toutesNotes, measureCapacity, noteBeats, type Accidental, type Articulation, type Barre, type Duration, type Measure, type Note, type Score } from "../shared/score";
+import { coteIndications, cotesLiaisons, notesADeuxVoix, notesSuivantes, segments, sensHampes, suiviAlterations, tetesLiees, type Sens } from "./solfege";
 
 const DUR: Record<Duration, string> = { whole: "1", half: "2", quarter: "4", eighth: "8", sixteenth: "16" };
 const ACCID: Record<NonNullable<Accidental>, string> = { sharp: "s", flat: "f", natural: "n" };
@@ -96,7 +96,8 @@ export function scoreToMei(score: Score): string {
   const suivantes = notesSuivantes(score);
   const sens = sensHampes(score);
   const cotes = cotesLiaisons(score, sens);
-  const parId = new Map(score.measures.flatMap((m) => [...m.treble, ...m.bass]).map((n) => [n.id, n]));
+  const deuxVoix = notesADeuxVoix(score);
+  const parId = new Map(score.measures.flatMap(toutesNotes).map((n) => [n.id, n]));
 
   /**
    * Rondes doigtées au bout d'une liaison du même côté : sans hampe, Verovio fait partir
@@ -108,12 +109,12 @@ export function scoreToMei(score: Score): string {
     const cote = cotes.get(n.id);
     if (!n.slurEnd || !cote) continue;
     for (const x of [n, parId.get(n.slurEnd)]) {
-      if (x?.duration === "whole" && coteTetes(sens.get(x.id)) === cote) chiffresRepousses.add(x.id);
+      if (x?.duration === "whole" && coteIndications(x.id, sens, deuxVoix) === cote) chiffresRepousses.add(x.id);
     }
   }
   const liaison = (n: Note, staff: 1 | 2) =>
     `<slur staff="${staff}" curvedir="${cotes.get(n.id) ?? "above"}" startid="#${n.id}" endid="#${n.slurEnd}"/>`;
-  const ids = new Set(score.measures.flatMap((m) => [...m.treble, ...m.bass].map((n) => n.id)));
+  const ids = new Set(score.measures.flatMap((m) => toutesNotes(m).map((n) => n.id)));
   const tete = (n: Note, i: number) => (n.pitches.length > 1 ? `${n.id}${CHORD_SEP}${i}` : n.id);
 
   /** Liaisons, nuances et soufflets qui commencent dans la mesure (placés entre les portées). */
@@ -128,13 +129,15 @@ export function scoreToMei(score: Score): string {
         // Doigtés : côté des têtes de notes, sous la liaison éventuelle.
         n.pitches.forEach((p, i) => {
           if (!p.doigt) return;
-          const place = coteTetes(sens.get(n.id));
+          const place = coteIndications(n.id, sens, deuxVoix);
           const vo = chiffresRepousses.has(n.id) ? ` vo="${place === "above" ? ECART_LIAISON : -ECART_LIAISON}vu"` : "";
           xml += `<fing staff="${staff}" place="${place}"${vo} startid="#${tete(n, i)}">${p.doigt}</fing>`;
         });
         if (n.arpege && n.pitches.length > 1) xml += `<arpeg staff="${staff}" startid="#${n.id}"/>`;
         if (n.articulations?.includes("fermata")) {
-          xml += `<fermata staff="${staff}" place="${staff === 1 ? "above" : "below"}" startid="#${n.id}"/>`;
+          const s = sens.get(n.id);
+          const place = s ? (s === "up" ? "above" : "below") : staff === 1 ? "above" : "below";
+          xml += `<fermata staff="${staff}" place="${place}" startid="#${n.id}"/>`;
         }
         if (n.hairpin && ids.has(n.hairpin.end)) {
           xml += `<hairpin form="${n.hairpin.form}" staff="${staff}" place="below" startid="#${n.id}" endid="#${n.hairpin.end}"/>`;
@@ -147,10 +150,16 @@ export function scoreToMei(score: Score): string {
   const xmlMesures = score.measures.map(
       (m, i) =>
         `<measure xml:id="${m.id}" n="${i + 1}"${barres(m, i === derniere)}>` +
-        `<staff n="1"><layer n="1">${layer(m.treble, score, sens)}</layer></staff>` +
-        `<staff n="2"><layer n="1">${layer(m.bass, score, sens)}</layer></staff>` +
+        `<staff n="1"><layer n="1">${layer(m.treble, score, sens)}</layer>` +
+        (aDeuxVoix(m, "treble") ? `<layer n="2">${layer(notesDe(m, "treble2"), score, sens)}</layer>` : "") +
+        `</staff>` +
+        `<staff n="2"><layer n="1">${layer(m.bass, score, sens)}</layer>` +
+        (aDeuxVoix(m, "bass") ? `<layer n="2">${layer(notesDe(m, "bass2"), score, sens)}</layer>` : "") +
+        `</staff>` +
         indications(m.treble, 1) +
+        indications(notesDe(m, "treble2"), 1) +
         indications(m.bass, 2) +
+        indications(notesDe(m, "bass2"), 2) +
         (m.texte ? `<dir staff="1" place="above" tstamp="0"><rend fontstyle="normal">${esc(m.texte)}</rend></dir>` : "") +
         (i === 0 && !score.tempoMasque
           ? `<tempo tstamp="1" staff="1" place="above" mm="${score.tempo}" mm.unit="4" midi.bpm="${score.tempo}">` +

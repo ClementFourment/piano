@@ -1,8 +1,8 @@
 // Export MusicXML 4.0 (partwise) : une partie « Piano » à deux portées.
 // S'ouvre dans MuseScore, Sibelius, Finale, Dorico…
 
-import { KEY_SIGNATURES, measureCapacity, noteBeats, type Accidental, type Articulation, type Duration, type Note, type Score } from "../shared/score";
-import { coteTetes, cotesLiaisons, notesSuivantes, segments, sensHampes, suiviAlterations, tetesLiees, type Sens } from "./solfege";
+import { KEY_SIGNATURES, PORTEES, aDeuxVoix, measureCapacity, notesDe, toutesNotes, noteBeats, type Accidental, type Articulation, type Duration, type Note, type Score } from "../shared/score";
+import { coteIndications, cotesLiaisons, notesADeuxVoix, notesSuivantes, segments, sensHampes, suiviAlterations, tetesLiees, type Sens } from "./solfege";
 
 /** Unités par noire : 12, divisible par 4 (doubles croches) et par 3 (triolets). */
 const DIVISIONS = 12;
@@ -45,17 +45,19 @@ interface Contexte {
   /** Sens des hampes, et côté de chaque liaison de phrasé (clé : note de départ). */
   sens: Map<string, Sens>;
   cotes: Map<string, "above" | "below">;
+  deuxVoix: Set<string>;
 }
 
 function contexte(score: Score): Contexte {
   const suivantes = notesSuivantes(score);
-  const ids = new Set(score.measures.flatMap((m) => [...m.treble, ...m.bass].map((n) => n.id)));
-  const ctx: Contexte = { suivantes, finsDeProlongation: new Set(), finsDeLiaison: new Map(), finsDeSoufflet: new Set(), numeros: new Map(), sens: sensHampes(score), cotes: new Map() };
+  const ids = new Set(score.measures.flatMap((m) => toutesNotes(m).map((n) => n.id)));
+  const ctx: Contexte = { suivantes, finsDeProlongation: new Set(), finsDeLiaison: new Map(), finsDeSoufflet: new Set(), numeros: new Map(), sens: sensHampes(score), cotes: new Map(), deuxVoix: notesADeuxVoix(score) };
   ctx.cotes = cotesLiaisons(score, ctx.sens);
-  for (const cle of ["treble", "bass"] as const) {
-    let numero = 0;
+  // Numéros de liaison communs aux deux voix (deux liaisons ouvertes ne doivent pas partager un numéro).
+  let numero = 0;
+  for (const cle of PORTEES) {
     for (const m of score.measures) {
-      for (const n of m[cle]) {
+      for (const n of notesDe(m, cle)) {
         const suiv = suivantes.get(n.id);
         for (const [, j] of tetesLiees(n, suiv)) ctx.finsDeProlongation.add(`${suiv!.id}:${j}`);
         if (n.slurEnd && ids.has(n.slurEnd)) {
@@ -83,8 +85,8 @@ function articulationsXml(n: Note): string {
 /** Vélocité de chaque nuance ramenée à l'échelle MusicXML (100 = forte… environ). */
 const SON_NUANCE: Record<string, number> = { pp: 38, p: 54, mp: 69, mf: 84, f: 102, ff: 118 };
 
-function portee(notes: Note[], score: Score, staff: 1 | 2, ctx: Contexte): { xml: string; duree: number } {
-  const voice = staff === 1 ? 1 : 5;
+function portee(notes: Note[], score: Score, staff: 1 | 2, ctx: Contexte, voix: 1 | 2 = 1): { xml: string; duree: number } {
+  const voice = (staff === 1 ? 1 : 5) + voix - 1;
   const capacite = unites(measureCapacity(score.timeSig));
   const fin = `<voice>${voice}</voice>`;
   const direction = (contenu: string, son = "") =>
@@ -135,7 +137,7 @@ function portee(notes: Note[], score: Score, staff: 1 | 2, ctx: Contexte): { xml
         let notations = (arrivee ? '<tied type="stop"/>' : "") + (depart ? '<tied type="start"/>' : "");
         // L'arpège se note sur chaque note de l'accord.
         if (n.arpege && n.pitches.length > 1) notations += "<arpeggiate/>";
-        if (p.doigt) notations += `<technical><fingering placement="${coteTetes(ctx.sens.get(n.id))}">${p.doigt}</fingering></technical>`;
+        if (p.doigt) notations += `<technical><fingering placement="${coteIndications(n.id, ctx.sens, ctx.deuxVoix)}">${p.doigt}</fingering></technical>`;
         if (i === 0) {
           notations += marqueTriolet + articulationsXml(n);
           const finLiaison = ctx.finsDeLiaison.get(n.id);
@@ -220,9 +222,14 @@ export function scoreToMusicXml(score: Score): string {
       if (m.texte) {
         xml += `<direction placement="above"><direction-type><words>${esc(m.texte)}</words></direction-type><staff>1</staff></direction>`;
       }
-      const haut = portee(m.treble, score, 1, ctx);
-      const bas = portee(m.bass, score, 2, ctx);
-      xml += haut.xml + `<backup><duration>${haut.duree}</duration></backup>` + bas.xml;
+      // Chaque voix est écrite à la suite, en revenant au début de la mesure entre deux.
+      const voix = [
+        portee(m.treble, score, 1, ctx),
+        ...(aDeuxVoix(m, "treble") ? [portee(notesDe(m, "treble2"), score, 1, ctx, 2)] : []),
+        portee(m.bass, score, 2, ctx),
+        ...(aDeuxVoix(m, "bass") ? [portee(notesDe(m, "bass2"), score, 2, ctx, 2)] : []),
+      ];
+      xml += voix.map((v, i) => (i ? `<backup><duration>${voix[i - 1].duree}</duration></backup>` : "") + v.xml).join("");
       xml += barreDroite(score, i);
       return xml + `</measure>`;
     })

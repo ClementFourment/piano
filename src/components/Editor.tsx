@@ -4,6 +4,11 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ScoreDoc } from "../../shared/api";
 import {
   LETTERS,
+  cleDe,
+  notesDe,
+  portee,
+  voixDe,
+  type Voix,
   measureCapacity,
   noteBeats,
   type Accidental,
@@ -101,9 +106,11 @@ export function Editor({ doc, onBack, onChange }: Props) {
 
   // ── Commandes ──
   const cle = curseur.cle;
+  const clef = cleDe(cle);
+  const voix = voixDe(cle);
 
   function note(letter: Letter, accord = false) {
-    const pitch = { letter, accidental: alteration, octave: octaves[cle] };
+    const pitch = { letter, accidental: alteration, octave: octaves[clef] };
     setAlteration(null);
     if (accord || modeAccord) return appliquer(M.ajouterAuAccord(etat, pitch));
     if (selection) return appliquer(M.remplacerHauteur(etat, selection, pitch));
@@ -145,14 +152,18 @@ export function Editor({ doc, onBack, onChange }: Props) {
     appliquer(M.supprimerAvant(etat));
   }
 
-  function changerCle(c: Clef) {
-    const index = score.measures[curseur.mesure][c].length;
-    appliquer({ ...etat, selection: null, curseur: { mesure: curseur.mesure, cle: c, index } }, false);
+  /** Place le curseur en fin de la portée et de la voix choisies, dans la mesure courante. */
+  function allerPortee(c: Clef, v: Voix) {
+    const p = portee(c, v);
+    const index = notesDe(score.measures[curseur.mesure], p).length;
+    appliquer({ ...etat, selection: null, curseur: { mesure: curseur.mesure, cle: p, index } }, false);
   }
+  const changerCle = (c: Clef) => allerPortee(c, voix);
+  const changerVoix = (v: Voix) => allerPortee(clef, v);
 
   function allerMesure(delta: -1 | 1) {
     const mesure = Math.max(0, Math.min(score.measures.length - 1, curseur.mesure + delta));
-    appliquer({ ...etat, selection: null, curseur: { mesure, cle, index: score.measures[mesure][cle].length } }, false);
+    appliquer({ ...etat, selection: null, curseur: { mesure, cle, index: notesDe(score.measures[mesure], cle).length } }, false);
   }
 
   function dupliquer(debut: number, fin: number) {
@@ -215,9 +226,10 @@ export function Editor({ doc, onBack, onChange }: Props) {
       } else if (k === "ArrowUp" || k === "ArrowDown") {
         const n = M.cible(etat);
         if (n && !n.rest) appliquer(M.transposer(etat, n.id, k === "ArrowUp" ? 1 : -1));
-        else setOctaves((o) => ({ ...o, [cle]: Math.max(0, Math.min(8, o[cle] + (k === "ArrowUp" ? 1 : -1))) }));
+        else setOctaves((o) => ({ ...o, [clef]: Math.max(0, Math.min(8, o[clef] + (k === "ArrowUp" ? 1 : -1))) }));
       } else if (k === "ArrowLeft" || k === "ArrowRight") appliquer(M.naviguer(etat, k === "ArrowLeft" ? -1 : 1), false);
-      else if (k === "Tab") changerCle(cle === "treble" ? "bass" : "treble");
+      else if (k === "Tab") changerCle(clef === "treble" ? "bass" : "treble");
+      else if (k.toLowerCase() === "v") changerVoix(voix === 1 ? 2 : 1);
       else if (k.toLowerCase() === "t") basculerTriolet();
       else if (k.toLowerCase() === "s") surCible((id) => M.articuler(etat, id, "staccato"));
       else if (k.toLowerCase() === "l") surCible((id) => (e.shiftKey ? M.delier(etat, id) : M.lier(etat, id)));
@@ -265,11 +277,11 @@ export function Editor({ doc, onBack, onChange }: Props) {
     if (selection) racine.querySelector(`[id="${CSS.escape(selection)}"]`)?.classList.add("selectionnee");
 
     const mesure = score.measures[curseur.mesure];
-    const staff = mesure && porteeSvg(racine, mesure.id, curseur.cle);
+    const staff = mesure && porteeSvg(racine, mesure.id, cleDe(curseur.cle));
     if (!staff) return setRepere(null);
     const lignes = rectLignes(staff);
     const base = racine.getBoundingClientRect();
-    const notes = mesure[curseur.cle];
+    const notes = notesDe(mesure, curseur.cle);
     let x: number;
     const avant = notes[curseur.index - 1] && racine.querySelector(`[id="${CSS.escape(notes[curseur.index - 1].id)}"]`);
     const apres = notes[curseur.index] && racine.querySelector(`[id="${CSS.escape(notes[curseur.index].id)}"]`);
@@ -309,14 +321,14 @@ export function Editor({ doc, onBack, onChange }: Props) {
         const r = rectLignes(staff);
         const marge = r.height * 0.6;
         if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top - marge || e.clientY > r.bottom + marge) continue;
-        const notes = score.measures[m][c];
+        const notes = notesDe(score.measures[m], portee(c, voix));
         const index = notes.filter((n) => {
           const el = racine.querySelector(`[id="${CSS.escape(n.id)}"]`);
           if (!el) return false;
           const b = el.getBoundingClientRect();
           return b.left + b.width / 2 < e.clientX;
         }).length;
-        return appliquer({ ...etat, selection: null, curseur: { mesure: m, cle: c, index } }, false);
+        return appliquer({ ...etat, selection: null, curseur: { mesure: m, cle: portee(c, voix), index } }, false);
       }
     }
   }
@@ -371,7 +383,7 @@ export function Editor({ doc, onBack, onChange }: Props) {
   const mesureCourante = score.measures[curseur.mesure];
   const capacite = measureCapacity(score.timeSig);
   const rempli = M.remplissage(score, curseur.mesure, cle);
-  const nomPortee = cle === "treble" ? "main droite" : "main gauche";
+  const nomPortee = (clef === "treble" ? "main droite" : "main gauche") + (voix === 2 ? ", voix 2" : "");
   const statut = noteSelectionnee
     ? `Note sélectionnée : ${noteSelectionnee.rest ? "silence" : noteSelectionnee.pitches.map((p) => NOMS_NOTES[p.letter] + (p.accidental ? { sharp: "♯", flat: "♭", natural: "♮" }[p.accidental] : "") + p.octave).join(" + ")} (${M.formatTemps(noteBeats(noteSelectionnee))})`
     : rempli >= capacite - 1e-9
@@ -428,8 +440,10 @@ export function Editor({ doc, onBack, onChange }: Props) {
           {paletteOuverte && <div className="rail-backdrop" onClick={() => setPaletteOuverte(false)} />}
           <div className={`rail-wrap${paletteOuverte ? " open" : ""}`}>
             <Palette
-              cle={cle}
-              octave={octaves[cle]}
+              cle={clef}
+              voix={voix}
+              onVoix={changerVoix}
+              octave={octaves[clef]}
               duree={duree}
               pointee={pointee}
               triolet={triolet}
@@ -454,7 +468,7 @@ export function Editor({ doc, onBack, onChange }: Props) {
               peutAnnuler={passe.length > 0}
               peutRetablir={futur.length > 0}
               onCle={changerCle}
-              onOctave={(d) => setOctaves((o) => ({ ...o, [cle]: Math.max(0, Math.min(8, o[cle] + d)) }))}
+              onOctave={(d) => setOctaves((o) => ({ ...o, [clef]: Math.max(0, Math.min(8, o[clef] + d)) }))}
               onDuree={(d) => choisirDuree(d)}
               onPointee={() => choisirDuree(duree, !pointee)}
               onAlteration={choisirAlteration}

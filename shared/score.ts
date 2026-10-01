@@ -66,8 +66,12 @@ export type Barre = (typeof BARRES)[number];
 
 export interface Measure {
   id: string;
+  /** Voix 1 de chaque portée. */
   treble: Note[];
   bass: Note[];
+  /** Voix 2 (facultative) : notes jouées en même temps que la voix 1, hampes en bas. */
+  treble2?: Note[];
+  bass2?: Note[];
   /** Barre de fin (absente : simple, ou finale pour la dernière mesure). */
   barre?: Barre;
   /** La mesure commence par un début de reprise (‖:). */
@@ -91,6 +95,20 @@ export interface Score {
   keySignature: KeySignature;
   measures: Measure[];
 }
+
+/** Une suite de notes d'une mesure : portée (clé de sol / de fa) et voix (1 ou 2). */
+export const PORTEES = ["treble", "bass", "treble2", "bass2"] as const;
+export type Portee = (typeof PORTEES)[number];
+export type Voix = 1 | 2;
+
+export const cleDe = (p: Portee): Clef => (p.startsWith("treble") ? "treble" : "bass");
+export const voixDe = (p: Portee): Voix => (p.endsWith("2") ? 2 : 1);
+export const portee = (cle: Clef, voix: Voix): Portee => (voix === 2 ? `${cle}2` : cle);
+export const notesDe = (m: Measure, p: Portee): Note[] => m[p] ?? [];
+/** Toutes les notes d'une mesure (les deux portées, les deux voix). */
+export const toutesNotes = (m: Measure): Note[] => PORTEES.flatMap((p) => notesDe(m, p));
+/** La portée a deux voix dans cette mesure. */
+export const aDeuxVoix = (m: Measure, cle: Clef): boolean => notesDe(m, portee(cle, 2)).length > 0;
 
 export const BEATS: Record<Duration, number> = { whole: 4, half: 2, quarter: 1, eighth: 0.5, sixteenth: 0.25 };
 
@@ -222,9 +240,13 @@ export function lireScore(v: unknown): Score | string {
     if (!isObj(m)) return "Mesure invalide.";
     const treble = lirePortee(m.treble);
     const bass = lirePortee(m.bass);
-    if (!treble || !bass) return `Note invalide dans la mesure ${measures.length + 1}.`;
+    const treble2 = lirePortee(m.treble2);
+    const bass2 = lirePortee(m.bass2);
+    if (!treble || !bass || !treble2 || !bass2) return `Note invalide dans la mesure ${measures.length + 1}.`;
     const id = estId(m.id) ? m.id : newId();
     const mesure: Measure = { id, treble, bass };
+    if (treble2.length) mesure.treble2 = treble2;
+    if (bass2.length) mesure.bass2 = bass2;
     if (BARRES.includes(m.barre as Barre)) mesure.barre = m.barre as Barre;
     if (m.repriseDebut === true) mesure.repriseDebut = true;
     if (m.volta === 1 || m.volta === 2) mesure.volta = m.volta;
@@ -244,7 +266,7 @@ export function lireScore(v: unknown): Score | string {
   };
   for (const m of measures) {
     m.id = unique(m.id);
-    for (const n of [...m.treble, ...m.bass]) n.id = unique(n.id);
+    for (const n of toutesNotes(m)) n.id = unique(n.id);
   }
 
   return {

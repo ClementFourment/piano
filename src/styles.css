@@ -269,6 +269,7 @@ input {
 .btn.icon { width: 32px; padding: 0.32rem 0; text-align: center; }
 .measure-nav { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; margin-bottom: 0.5rem; }
 .measure-nav .label { font-size: 12.5px; color: var(--ink-soft); text-align: center; flex: 1; }
+.seg.espace-seg { margin-top: 0.4rem; }
 .row2 { display: flex; gap: 0.4rem; margin-bottom: 0.4rem; }
 .row2 > * { flex: 1; }
 .raccourcis { margin-top: 0.5rem; font-size: 12px; }
