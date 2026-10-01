@@ -131,6 +131,7 @@ function portee(notes: Note[], score: Score, staff: 1 | 2, ctx: Contexte): { xml
         let notations = (arrivee ? '<tied type="stop"/>' : "") + (depart ? '<tied type="start"/>' : "");
         // L'arpège se note sur chaque note de l'accord.
         if (n.arpege && n.pitches.length > 1) notations += "<arpeggiate/>";
+        if (p.doigt) notations += `<technical><fingering placement="${staff === 1 ? "above" : "below"}">${p.doigt}</fingering></technical>`;
         if (i === 0) {
           notations += marqueTriolet + articulationsXml(n);
           const finLiaison = ctx.finsDeLiaison.get(n.id);
@@ -205,9 +206,11 @@ export function scoreToMusicXml(score: Score): string {
           `<clef number="1"><sign>G</sign><line>2</line></clef>` +
           `<clef number="2"><sign>F</sign><line>4</line></clef>` +
           `</attributes>` +
-          `<direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit>` +
-          `<per-minute>${score.tempo}</per-minute></metronome></direction-type>` +
-          `<staff>1</staff><sound tempo="${score.tempo}"/></direction>`;
+          (score.tempoMasque
+            ? `<sound tempo="${score.tempo}"/>`
+            : `<direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit>` +
+              `<per-minute>${score.tempo}</per-minute></metronome></direction-type>` +
+              `<staff>1</staff><sound tempo="${score.tempo}"/></direction>`);
       }
       const haut = portee(m.treble, score, 1, ctx);
       const bas = portee(m.bass, score, 2, ctx);

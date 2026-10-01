@@ -1,6 +1,7 @@
 // Palette d'outils de l'éditeur (colonne de gauche), reprise du prototype.
 
-import { DYNAMICS, KEY_SIGNATURES, type Accidental, type Articulation, type Barre, type Clef, type Duration, type Dynamic, type KeySignature, type Letter } from "../../shared/score";
+import { useEffect, useState } from "react";
+import { DOIGTS, DYNAMICS, KEY_SIGNATURES, type Doigt, type Accidental, type Articulation, type Barre, type Clef, type Duration, type Dynamic, type KeySignature, type Letter } from "../../shared/score";
 
 export const NOMS_NOTES: Record<Letter, string> = { C: "Do", D: "Ré", E: "Mi", F: "Fa", G: "Sol", A: "La", B: "Si" };
 
@@ -59,6 +60,8 @@ export interface PaletteProps {
   mesure: number;
   nbMesures: number;
   tempo: number;
+  tempoVisible: boolean;
+  mains: boolean;
   chiffrage: string;
   armure: KeySignature;
   peutAnnuler: boolean;
@@ -73,6 +76,9 @@ export interface PaletteProps {
   onArticulation: (a: Articulation) => void;
   arpege: boolean;
   onArpege: () => void;
+  /** Doigtés de la note visée, du grave à l'aigu (vide : silence ou aucune note). */
+  doigts: (Doigt | undefined)[];
+  onDoigt: (d: Doigt | null) => void;
   onAlteration: (a: NonNullable<Accidental>) => void;
   onNote: (l: Letter) => void;
   onModeAccord: (v: boolean) => void;
@@ -96,6 +102,8 @@ export interface PaletteProps {
   onRepriseDebut: (v: boolean) => void;
   onVolta: (v: 1 | 2 | null) => void;
   onTempo: (t: number) => void;
+  onTempoVisible: (v: boolean) => void;
+  onMains: (v: boolean) => void;
   onChiffrage: (c: string) => void;
   onArmure: (k: KeySignature) => void;
   onAnnuler: () => void;
@@ -236,6 +244,30 @@ export function Palette(p: PaletteProps) {
       </section>
 
       <section className="rail-section">
+        <div className="rail-title">Doigtés</div>
+        <div className="artic-grid" role="group" aria-label="Doigtés">
+          {DOIGTS.map((d) => (
+            <button
+              key={d}
+              className={`dyn-btn${p.doigts.length === 1 && p.doigts[0] === d ? " active" : ""}`}
+              onClick={() => p.onDoigt(d)}
+              title={`Doigt ${d} (Alt + ${d})`}
+            >
+              {d}
+            </button>
+          ))}
+          <button className="dyn-btn" onClick={() => p.onDoigt(null)} title="Retirer les doigtés de la note" aria-label="Retirer les doigtés">
+            ✕
+          </button>
+        </div>
+        {p.doigts.length > 1 && (
+          <p className="chord-hint">
+            Accord : chaque chiffre va sur la note suivante, du grave à l'aigu ({p.doigts.map((d) => d ?? "·").join(" ")}).
+          </p>
+        )}
+      </section>
+
+      <section className="rail-section">
         <div className="rail-title">Liaisons et nuances</div>
         <div className="row2">
           <button className="btn small" onClick={p.onLier} title="Relie la note à la suivante (touche L) ; appuyer encore allonge la liaison">
@@ -326,17 +358,13 @@ export function Palette(p: PaletteProps) {
         <label className="field-label" htmlFor="tempo">
           Tempo (noires par minute)
         </label>
-        <input
-          id="tempo"
-          type="number"
-          min={20}
-          max={300}
-          value={p.tempo}
-          onChange={(e) => {
-            const t = parseInt(e.target.value);
-            if (t >= 20 && t <= 300) p.onTempo(t);
-          }}
-        />
+        <ChampTempo tempo={p.tempo} onTempo={p.onTempo} />
+        <label className="dot-row">
+          <input type="checkbox" checked={p.tempoVisible} onChange={(e) => p.onTempoVisible(e.target.checked)} /> Afficher le tempo sur la partition
+        </label>
+        <label className="dot-row" title="M.D. devant la portée du haut, M.G. devant celle du bas">
+          <input type="checkbox" checked={p.mains} onChange={(e) => p.onMains(e.target.checked)} /> Écrire M.D. / M.G. devant les portées
+        </label>
         <label className="field-label" htmlFor="chiffrage">
           Chiffrage
         </label>
@@ -381,6 +409,7 @@ export function Palette(p: PaletteProps) {
             <dt>Tab</dt><dd>changer de portée</dd>
             <dt>T</dt><dd>triolet</dd>
             <dt>S</dt><dd>staccato</dd>
+            <dt>Alt + 1 à 5</dt><dd>doigté</dd>
             <dt>L / Maj+L</dt><dd>lier / délier</dd>
             <dt>&lt; &gt;</dt><dd>crescendo / decrescendo</dd>
             <dt>⌫ / Suppr</dt><dd>effacer</dd>
@@ -391,5 +420,39 @@ export function Palette(p: PaletteProps) {
         </details>
       </section>
     </aside>
+  );
+}
+
+const TEMPO_MIN = 20;
+const TEMPO_MAX = 300;
+
+/** Tempo tapé au clavier : appliqué dès qu'il est valable, corrigé en quittant le champ. */
+function ChampTempo({ tempo, onTempo }: { tempo: number; onTempo: (t: number) => void }) {
+  const [texte, setTexte] = useState(String(tempo));
+  useEffect(() => setTexte(String(tempo)), [tempo]);
+
+  function valider() {
+    const t = parseInt(texte);
+    const corrige = Number.isNaN(t) ? tempo : Math.max(TEMPO_MIN, Math.min(TEMPO_MAX, t));
+    setTexte(String(corrige));
+    if (corrige !== tempo) onTempo(corrige);
+  }
+
+  return (
+    <input
+      id="tempo"
+      type="text"
+      inputMode="numeric"
+      autoComplete="off"
+      value={texte}
+      onChange={(e) => {
+        const v = e.target.value.replace(/\D/g, "").slice(0, 3);
+        setTexte(v);
+        const t = parseInt(v);
+        if (t >= TEMPO_MIN && t <= TEMPO_MAX) onTempo(t);
+      }}
+      onBlur={valider}
+      onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+    />
   );
 }

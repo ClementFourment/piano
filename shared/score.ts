@@ -25,7 +25,12 @@ export interface Pitch {
   /** Altération écrite devant la note (null = aucune ; l'armure s'applique). */
   accidental: Accidental;
   octave: number;
+  /** Doigté (1 = pouce … 5 = auriculaire). */
+  doigt?: Doigt;
 }
+
+export const DOIGTS = [1, 2, 3, 4, 5] as const;
+export type Doigt = (typeof DOIGTS)[number];
 
 export const ARTICULATIONS = ["staccato", "accent", "tenuto", "marcato", "fermata"] as const;
 export type Articulation = (typeof ARTICULATIONS)[number];
@@ -76,6 +81,10 @@ export interface Score {
   title: string;
   composer: string;
   tempo: number;
+  /** Indication de tempo masquée sur la partition (la lecture garde le tempo). */
+  tempoMasque?: boolean;
+  /** « M.D. » et « M.G. » écrits devant chaque système. */
+  mains?: boolean;
   timeSig: { num: number; den: number };
   keySignature: KeySignature;
   measures: Measure[];
@@ -134,7 +143,9 @@ function lirePitch(p: unknown): Pitch | null {
   const accidental = p.accidental ?? null;
   if (accidental !== null && !ACCIDENTALS.includes(accidental as never)) return null;
   if (!Number.isInteger(p.octave) || (p.octave as number) < 0 || (p.octave as number) > 8) return null;
-  return { letter: p.letter as Letter, accidental: accidental as Accidental, octave: p.octave as number };
+  const pitch: Pitch = { letter: p.letter as Letter, accidental: accidental as Accidental, octave: p.octave as number };
+  if (DOIGTS.includes(p.doigt as Doigt)) pitch.doigt = p.doigt as Doigt;
+  return pitch;
 }
 
 /**
@@ -238,6 +249,8 @@ export function lireScore(v: unknown): Score | string {
     title: texte(v.title, "Sans titre"),
     composer: texte(v.composer, ""),
     tempo: tempo as number,
+    ...(v.tempoMasque === true ? { tempoMasque: true } : {}),
+    ...(v.mains === true ? { mains: true } : {}),
     timeSig: { num: num as number, den: den as number },
     keySignature,
     measures,

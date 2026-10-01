@@ -85,6 +85,9 @@ export function scoreToMei(score: Score): string {
   const titre = esc(score.title);
   const compositeur = esc(score.composer);
 
+  /** Nom de la main devant la portée, sur chaque système. */
+  const main = (nom: string) => (score.mains ? `<label>${nom}</label><labelAbbr>${nom}</labelAbbr>` : "");
+
   const suivantes = notesSuivantes(score);
   const ids = new Set(score.measures.flatMap((m) => [...m.treble, ...m.bass].map((n) => n.id)));
   const tete = (n: Note, i: number) => (n.pitches.length > 1 ? `${n.id}${CHORD_SEP}${i}` : n.id);
@@ -98,6 +101,10 @@ export function scoreToMei(score: Score): string {
         for (const [i, j] of tetesLiees(n, suiv)) xml += `<tie startid="#${tete(n, i)}" endid="#${tete(suiv!, j)}"/>`;
         if (n.slurEnd && ids.has(n.slurEnd)) xml += `<slur staff="${staff}" startid="#${n.id}" endid="#${n.slurEnd}"/>`;
         if (n.dynamic) xml += `<dynam staff="${staff}" place="below" startid="#${n.id}">${n.dynamic}</dynam>`;
+        // Doigtés : au-dessus en main droite, en dessous en main gauche (du grave à l'aigu).
+        n.pitches.forEach((p, i) => {
+          if (p.doigt) xml += `<fing staff="${staff}" place="${staff === 1 ? "above" : "below"}" startid="#${tete(n, i)}">${p.doigt}</fing>`;
+        });
         if (n.arpege && n.pitches.length > 1) xml += `<arpeg staff="${staff}" startid="#${n.id}"/>`;
         if (n.articulations?.includes("fermata")) {
           xml += `<fermata staff="${staff}" place="${staff === 1 ? "above" : "below"}" startid="#${n.id}"/>`;
@@ -117,7 +124,7 @@ export function scoreToMei(score: Score): string {
         `<staff n="2"><layer n="1">${layer(m.bass, score)}</layer></staff>` +
         indications(m.treble, 1) +
         indications(m.bass, 2) +
-        (i === 0
+        (i === 0 && !score.tempoMasque
           ? `<tempo tstamp="1" staff="1" place="above" mm="${score.tempo}" mm.unit="4" midi.bpm="${score.tempo}">` +
             `<rend fontstyle="normal"><rend glyph.auth="smufl">&#xE1D5;</rend> = ${score.tempo}</rend></tempo>`
           : "") +
@@ -142,8 +149,8 @@ export function scoreToMei(score: Score): string {
 <music><body><mdiv><score>
 <scoreDef midi.bpm="${score.tempo}">
 <staffGrp symbol="brace" bar.thru="true">
-<staffDef n="1" lines="5"><clef shape="G" line="2"/><keySig sig="${keysig}"/><meterSig count="${score.timeSig.num}" unit="${score.timeSig.den}"/></staffDef>
-<staffDef n="2" lines="5"><clef shape="F" line="4"/><keySig sig="${keysig}"/><meterSig count="${score.timeSig.num}" unit="${score.timeSig.den}"/></staffDef>
+<staffDef n="1" lines="5">${main("M.D.")}<clef shape="G" line="2"/><keySig sig="${keysig}"/><meterSig count="${score.timeSig.num}" unit="${score.timeSig.den}"/></staffDef>
+<staffDef n="2" lines="5">${main("M.G.")}<clef shape="F" line="4"/><keySig sig="${keysig}"/><meterSig count="${score.timeSig.num}" unit="${score.timeSig.den}"/></staffDef>
 </staffGrp>
 </scoreDef>
 <section>${mesures}</section>

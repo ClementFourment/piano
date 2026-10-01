@@ -11,6 +11,7 @@ import {
   type Accidental,
   type Articulation,
   type Clef,
+  type Doigt,
   type Duration,
   type Dynamic,
   type Measure,
@@ -185,7 +186,7 @@ export function transposer(etat: Etat, id: string, pas: number): Resultat {
       const octave = Math.floor(h / 7);
       if (octave < 0 || octave > 8) horsLimite = true;
       // L'altération écrite est retirée : la nouvelle note suit l'armure.
-      return { letter: LETTERS[((h % 7) + 7) % 7], accidental: null, octave };
+      return { letter: LETTERS[((h % 7) + 7) % 7], accidental: null, octave, ...(p.doigt ? { doigt: p.doigt } : {}) };
     }),
   }));
   return horsLimite ? "Hors de la tessiture du piano." : { ...etat, score };
@@ -331,6 +332,30 @@ export function basculerArpege(etat: Etat, id: string): Resultat {
   if (!note) return etat;
   if (note.rest || note.pitches.length < 2) return "L'arpège ne s'applique qu'à un accord (au moins deux notes).";
   return { ...etat, score: modifierNote(etat.score, id, ({ arpege, ...n }) => (arpege ? n : { ...n, arpege: true })) };
+}
+
+/**
+ * Doigté. Note seule : le met, ou le retire si c'est le même.
+ * Accord : remplit la note suivante sans doigté, du grave à l'aigu ; une fois
+ * l'accord complet, on recommence par le bas. `null` retire tous les doigtés.
+ */
+export function doigter(etat: Etat, id: string, doigt: Doigt | null): Resultat {
+  const note = trouverNote(etat.score, id);
+  if (!note) return etat;
+  if (note.rest) return "Un silence n'a pas de doigté.";
+  const sansDoigt = ({ doigt: _d, ...p }: Pitch): Pitch => p;
+  let pitches: Pitch[];
+  if (doigt === null) pitches = note.pitches.map(sansDoigt);
+  else if (note.pitches.length === 1) {
+    const p = note.pitches[0];
+    pitches = [p.doigt === doigt ? sansDoigt(p) : { ...p, doigt }];
+  } else {
+    // Accord déjà complet : on repart du grave.
+    pitches = note.pitches.every((p) => p.doigt) ? note.pitches.map(sansDoigt) : note.pitches.slice();
+    const i = pitches.findIndex((p) => !p.doigt);
+    pitches[i] = { ...pitches[i], doigt };
+  }
+  return { ...etat, score: modifierNote(etat.score, id, (n) => ({ ...n, pitches })) };
 }
 
 /** Retire nuance et soufflet de la note. */

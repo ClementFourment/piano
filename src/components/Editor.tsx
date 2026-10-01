@@ -8,6 +8,7 @@ import {
   noteBeats,
   type Accidental,
   type Clef,
+  type Doigt,
   type Duration,
   type KeySignature,
   type Letter,
@@ -179,7 +180,11 @@ export function Editor({ doc, onBack, onChange }: Props) {
         } else return;
         return e.preventDefault();
       }
-      if (e.altKey) return;
+      if (e.altKey) {
+        if (!/^Digit[1-5]$/.test(e.code)) return;
+        surCible((id) => M.doigter(etat, id, Number(e.code.slice(5)) as Doigt));
+        return e.preventDefault();
+      }
 
       const lettre = k.toUpperCase();
       if (k.length === 1 && (LETTERS as readonly string[]).includes(lettre)) note(lettre as Letter, e.shiftKey);
@@ -416,6 +421,8 @@ export function Editor({ doc, onBack, onChange }: Props) {
               onArticulation={(a) => surCible((id) => M.articuler(etat, id, a))}
               arpege={!!M.cible(etat)?.arpege}
               onArpege={() => surCible((id) => M.basculerArpege(etat, id))}
+              doigts={M.cible(etat)?.pitches.map((p) => p.doigt) ?? []}
+              onDoigt={(d) => surCible((id) => M.doigter(etat, id, d))}
               alteration={alteration}
               modeAccord={modeAccord}
               selection={selection !== null}
@@ -423,6 +430,8 @@ export function Editor({ doc, onBack, onChange }: Props) {
               mesure={curseur.mesure}
               nbMesures={score.measures.length}
               tempo={score.tempo}
+              tempoVisible={!score.tempoMasque}
+              mains={!!score.mains}
               chiffrage={`${score.timeSig.num}/${score.timeSig.den}`}
               armure={score.keySignature}
               peutAnnuler={passe.length > 0}
@@ -452,6 +461,8 @@ export function Editor({ doc, onBack, onChange }: Props) {
               onRepriseDebut={(v) => appliquer(M.reglerMesure(etat, curseur.mesure, { repriseDebut: v }))}
               onVolta={(v) => appliquer(M.reglerMesure(etat, curseur.mesure, { volta: v ?? undefined }))}
               onTempo={(t) => modifierScore({ tempo: t })}
+              onTempoVisible={(v) => appliquer({ ...etat, score: { ...score, tempoMasque: v ? undefined : true } })}
+              onMains={(v) => appliquer({ ...etat, score: { ...score, mains: v || undefined } })}
               onChiffrage={(c) => {
                 const [num, den] = c.split("/").map(Number);
                 appliquer(M.changerChiffrage(etat, num, den));
