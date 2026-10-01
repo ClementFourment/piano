@@ -195,20 +195,51 @@ export function sensHampes(score: Score): Map<string, Sens> {
 /** Côté des têtes de notes : à l'opposé de la hampe (doigtés, liaisons). */
 export const coteTetes = (s: Sens | undefined): "above" | "below" => (s === "up" ? "below" : "above");
 
+/** Longueur d'une hampe, en degrés (trois espaces et demi). */
+const HAMPE = 7;
+/** Écart (en degrés) à partir duquel le côté le plus dégagé l'emporte sur la règle classique. */
+const SEUIL_DEGAGEMENT = 5;
+
 /**
- * Côté de chaque liaison de phrasé (clé : note de départ) : côté des têtes si toutes
- * les hampes vont dans le même sens, au-dessus sinon.
+ * Côté de chaque liaison de phrasé (clé : note de départ).
+ * Règle classique : côté des têtes si toutes les hampes vont dans le même sens, au-dessus sinon.
+ * Mais si les notes intermédiaires dépassent nettement d'un côté (la liaison devrait faire un
+ * grand arc pour les enjamber) et beaucoup moins de l'autre, on prend le côté dégagé.
  */
 export function cotesLiaisons(score: Score, sens: Map<string, Sens>): Map<string, "above" | "below"> {
   const cotes = new Map<string, "above" | "below">();
+  const haut = (n: Note) => Math.max(...n.pitches.map(degre)) + (sens.get(n.id) === "up" && n.duration !== "whole" ? HAMPE : 0);
+  const bas = (n: Note) => Math.min(...n.pitches.map(degre)) - (sens.get(n.id) === "down" && n.duration !== "whole" ? HAMPE : 0);
+
   for (const cle of ["treble", "bass"] as const) {
     const notes = score.measures.flatMap((m) => m[cle]);
     notes.forEach((n, i) => {
       if (!n.slurEnd) return;
       const fin = notes.findIndex((x) => x.id === n.slurEnd);
-      if (fin < i) return;
-      const directions = new Set(notes.slice(i, fin + 1).map((x) => sens.get(x.id)).filter(Boolean));
-      cotes.set(n.id, directions.size === 1 ? coteTetes([...directions][0]) : "above");
+      if (fin <= i) return;
+      const tranche = notes.slice(i, fin + 1);
+      const directions = new Set(tranche.map((x) => sens.get(x.id)).filter(Boolean));
+      const classique = directions.size === 1 ? coteTetes([...directions][0]) : "above";
+
+      // Dépassement des notes intermédiaires au-delà de la droite qui relie les extrémités.
+      const temps: number[] = [];
+      tranche.reduce((t, x) => (temps.push(t), t + noteBeats(x)), 0);
+      const debut = tranche[0], dernier = tranche[tranche.length - 1];
+      const duree = temps[temps.length - 1] || 1;
+      const depassement = (bord: (x: Note) => number, signe: 1 | -1) => {
+        let max = 0;
+        tranche.forEach((x, j) => {
+          if (j === 0 || j === tranche.length - 1 || x.rest) return;
+          const droite = bord(debut) + ((bord(dernier) - bord(debut)) * temps[j]) / duree;
+          max = Math.max(max, signe * (bord(x) - droite));
+        });
+        return max;
+      };
+      const dessus = depassement(haut, 1);
+      const dessous = depassement(bas, -1);
+      const autre = classique === "above" ? "below" : "above";
+      const ecart = classique === "above" ? dessus - dessous : dessous - dessus;
+      cotes.set(n.id, ecart >= SEUIL_DEGAGEMENT ? autre : classique);
     });
   }
   return cotes;

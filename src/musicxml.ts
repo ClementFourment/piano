@@ -2,7 +2,7 @@
 // S'ouvre dans MuseScore, Sibelius, Finale, Dorico…
 
 import { KEY_SIGNATURES, measureCapacity, noteBeats, type Accidental, type Articulation, type Duration, type Note, type Score } from "../shared/score";
-import { cotesLiaisons, coteTetes, notesSuivantes, segments, sensHampes, suiviAlterations, tetesLiees, type Sens } from "./solfege";
+import { coteTetes, cotesLiaisons, notesSuivantes, segments, sensHampes, suiviAlterations, tetesLiees, type Sens } from "./solfege";
 
 /** Unités par noire : 12, divisible par 4 (doubles croches) et par 3 (triolets). */
 const DIVISIONS = 12;

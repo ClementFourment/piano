@@ -6,10 +6,13 @@
 // - les croches et doubles croches sont ligaturées par temps.
 
 import { KEY_SIGNATURES, measureCapacity, noteBeats, type Accidental, type Articulation, type Barre, type Duration, type Measure, type Note, type Score } from "../shared/score";
-import { cotesLiaisons, coteTetes, notesSuivantes, segments, sensHampes, suiviAlterations, tetesLiees, type Sens } from "./solfege";
+import { coteTetes, cotesLiaisons, notesSuivantes, segments, sensHampes, suiviAlterations, tetesLiees, type Sens } from "./solfege";
 
 const DUR: Record<Duration, string> = { whole: "1", half: "2", quarter: "4", eighth: "8", sixteenth: "16" };
 const ACCID: Record<NonNullable<Accidental>, string> = { sharp: "s", flat: "f", natural: "n" };
+
+/** Hauteur d'un chiffre de doigté, en demi-interlignes (unités MEI « vu »). */
+const HAUTEUR_DOIGT = 3;
 
 /** Suffixe des identifiants des notes d'un accord : `${id}${CHORD_SEP}${i}`. */
 export const CHORD_SEP = "-";
@@ -93,6 +96,29 @@ export function scoreToMei(score: Score): string {
   const suivantes = notesSuivantes(score);
   const sens = sensHampes(score);
   const cotes = cotesLiaisons(score, sens);
+  const parId = new Map(score.measures.flatMap((m) => [...m.treble, ...m.bass]).map((n) => [n.id, n]));
+
+  /**
+   * Décalage vertical (en demi-interlignes) d'un bout de liaison posé sur une ronde doigtée
+   * du même côté : sans hampe, Verovio part de la tête et passerait sur le chiffre.
+   * (Pour les notes à hampe, il écarte lui-même le chiffre.)
+   */
+  const decalage = (n: Note | undefined, cote: "above" | "below") => {
+    const chiffres = n?.duration === "whole" ? n.pitches.filter((p) => p.doigt).length : 0;
+    if (!chiffres || coteTetes(sens.get(n!.id)) !== cote) return 0;
+    return (cote === "above" ? 1 : -1) * (chiffres * HAUTEUR_DOIGT + 1);
+  };
+  const liaison = (n: Note, staff: 1 | 2) => {
+    const cote = cotes.get(n.id) ?? "above";
+    const debut = decalage(n, cote);
+    const fin = decalage(parId.get(n.slurEnd!), cote);
+    return (
+      `<slur staff="${staff}" curvedir="${cote}" startid="#${n.id}" endid="#${n.slurEnd}"` +
+      (debut ? ` startvo="${debut}vu"` : "") +
+      (fin ? ` endvo="${fin}vu"` : "") +
+      `/>`
+    );
+  };
   const ids = new Set(score.measures.flatMap((m) => [...m.treble, ...m.bass].map((n) => n.id)));
   const tete = (n: Note, i: number) => (n.pitches.length > 1 ? `${n.id}${CHORD_SEP}${i}` : n.id);
 
@@ -103,7 +129,7 @@ export function scoreToMei(score: Score): string {
         let xml = "";
         const suiv = suivantes.get(n.id);
         for (const [i, j] of tetesLiees(n, suiv)) xml += `<tie startid="#${tete(n, i)}" endid="#${tete(suiv!, j)}"/>`;
-        if (n.slurEnd && ids.has(n.slurEnd)) xml += `<slur staff="${staff}" curvedir="${cotes.get(n.id) ?? "above"}" startid="#${n.id}" endid="#${n.slurEnd}"/>`;
+        if (n.slurEnd && ids.has(n.slurEnd)) xml += liaison(n, staff);
         if (n.dynamic) xml += `<dynam staff="${staff}" place="below" startid="#${n.id}">${n.dynamic}</dynam>`;
         // Doigtés : côté des têtes de notes, sous la liaison éventuelle.
         n.pitches.forEach((p, i) => {
