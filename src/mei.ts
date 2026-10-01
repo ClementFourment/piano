@@ -91,6 +91,7 @@ export function scoreToMei(score: Score): string {
   const fifths = KEY_SIGNATURES[score.keySignature];
   const keysig = fifths === 0 ? "0" : `${Math.abs(fifths)}${fifths > 0 ? "s" : "f"}`;
   const titre = esc(score.title);
+  const chiffrage = `<meterSig count="${score.timeSig.num}" unit="${score.timeSig.den}"${score.chiffrageMasque ? ' visible="false"' : ""}/>`;
   const compositeur = esc(score.composer);
 
   /** Nom de la main devant la portée, sur chaque système. */
@@ -194,8 +195,8 @@ export function scoreToMei(score: Score): string {
 <music><body><mdiv><score>
 <scoreDef midi.bpm="${score.tempo}">
 <staffGrp symbol="brace" bar.thru="true">
-<staffDef n="1" lines="5">${main("M.D.")}<clef shape="G" line="2"/><keySig sig="${keysig}"/><meterSig count="${score.timeSig.num}" unit="${score.timeSig.den}"/></staffDef>
-<staffDef n="2" lines="5">${main("M.G.")}<clef shape="F" line="4"/><keySig sig="${keysig}"/><meterSig count="${score.timeSig.num}" unit="${score.timeSig.den}"/></staffDef>
+<staffDef n="1" lines="5">${main("M.D.")}<clef shape="G" line="2"/><keySig sig="${keysig}"/>${chiffrage}</staffDef>
+<staffDef n="2" lines="5">${main("M.G.")}<clef shape="F" line="4"/><keySig sig="${keysig}"/>${chiffrage}</staffDef>
 </staffGrp>
 </scoreDef>
 <section>${mesures}</section>

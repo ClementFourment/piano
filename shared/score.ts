@@ -91,6 +91,8 @@ export interface Score {
   tempo: number;
   /** Indication de tempo masquée sur la partition (la lecture garde le tempo). */
   tempoMasque?: boolean;
+  /** Chiffrage (4/4…) masqué sur la partition (les mesures gardent leur durée). */
+  chiffrageMasque?: boolean;
   /** Main devant chaque portée, sur chaque système : « M.D. » / « M.G. », ou un dessin de main. */
   mains?: Mains;
   timeSig: { num: number; den: number };
@@ -277,6 +279,7 @@ export function lireScore(v: unknown): Score | string {
     composer: texte(v.composer, ""),
     tempo: tempo as number,
     ...(v.tempoMasque === true ? { tempoMasque: true } : {}),
+    ...(v.chiffrageMasque === true ? { chiffrageMasque: true } : {}),
     // `true` : ancien format (case à cocher), équivaut à « texte ».
     ...(v.mains === true || v.mains === "texte" ? { mains: "texte" as const } : v.mains === "dessin" ? { mains: "dessin" as const } : {}),
     timeSig: { num: num as number, den: den as number },

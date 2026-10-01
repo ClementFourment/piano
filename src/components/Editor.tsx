@@ -462,6 +462,8 @@ export function Editor({ doc, onBack, onChange }: Props) {
               nbMesures={score.measures.length}
               tempo={score.tempo}
               tempoVisible={!score.tempoMasque}
+              chiffrageVisible={!score.chiffrageMasque}
+              onChiffrageVisible={(v) => appliquer({ ...etat, score: { ...score, chiffrageMasque: v ? undefined : true } })}
               mains={score.mains ?? null}
               chiffrage={`${score.timeSig.num}/${score.timeSig.den}`}
               armure={score.keySignature}

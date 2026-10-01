@@ -63,6 +63,8 @@ export interface PaletteProps {
   nbMesures: number;
   tempo: number;
   tempoVisible: boolean;
+  chiffrageVisible: boolean;
+  onChiffrageVisible: (v: boolean) => void;
   mains: Mains | null;
   chiffrage: string;
   armure: KeySignature;
@@ -405,6 +407,9 @@ export function Palette(p: PaletteProps) {
             <option key={c}>{c}</option>
           ))}
         </select>
+        <label className="dot-row">
+          <input type="checkbox" checked={p.chiffrageVisible} onChange={(e) => p.onChiffrageVisible(e.target.checked)} /> Afficher le chiffrage sur la partition
+        </label>
         <label className="field-label" htmlFor="armure">
           Armure
         </label>
