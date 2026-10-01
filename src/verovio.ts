@@ -68,25 +68,38 @@ function nettoyerSvg(svg: string): string {
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 /**
- * Main droite vue du dessus (dos de la main, pouce à gauche), dans une boîte de 104 × 120.
- * Dessinée deux fois : un trait épais, puis un remplissage blanc par-dessus, ce qui donne
- * le contour de l'ensemble sans les traits intérieurs.
+ * Main droite vue du dessus (dos de la main, pouce à gauche), dans une boîte de 100 × 120 :
+ * contour des doigts et du pouce, ouvert au poignet, avec les ongles et les plis des doigts.
  */
-const FORMES_MAIN =
-  '<rect x="30" y="56" width="52" height="56" rx="18"/>' +
-  '<rect x="30" y="22" width="13" height="50" rx="6.5"/>' +
-  '<rect x="44.5" y="11" width="13" height="60" rx="6.5"/>' +
-  '<rect x="59" y="17" width="13" height="56" rx="6.5"/>' +
-  '<rect x="72.5" y="33" width="11" height="42" rx="5.5"/>' +
-  '<rect x="27" y="54" width="14" height="46" rx="7" transform="rotate(-40 34 100)"/>';
+const CONTOUR_MAIN =
+  "M 40 118 C 39 108, 37 100, 33 93 C 26 86, 16 76, 11 66 C 8 60, 13 54, 19 58 C 25 62, 30 69, 35 72 " +
+  "C 34 60, 31 42, 30 30 C 29 22, 39 20, 40 28 C 41 40, 42 50, 43 58 C 44 44, 44 26, 45 16 " +
+  "C 46 8, 56 8, 56 16 C 56 28, 55 44, 55 57 C 57 46, 59 32, 61 23 C 63 16, 71 18, 70 26 " +
+  "C 69 38, 67 50, 66 60 C 69 52, 72 44, 75 38 C 78 32, 85 34, 84 41 C 82 52, 80 64, 80 74 " +
+  "C 80 88, 78 100, 74 118";
+const DETAILS_MAIN = [
+  // Ongles
+  "M 32 31 C 33 26, 38 25, 38.5 30",
+  "M 47 17 C 48 12, 54 12, 54.5 17",
+  "M 62.5 25 C 64 20, 69 20, 68.5 26",
+  "M 76.5 40 C 78 36, 83 36, 82.5 41",
+  "M 13.5 64 C 13 60, 17 57, 20 60",
+  // Plis des articulations
+  "M 33 50 C 35 49, 38 49, 40 50",
+  "M 46 44 C 48 43, 52 43, 54 44",
+  "M 60 46 C 62 45, 65 45, 67 46",
+  "M 73 54 C 75 53, 78 53, 80 54",
+  "M 20 74 C 22 72, 25 71, 27 72",
+].join(" ");
 
 function svgMain(droite: boolean, x: number, y: number, largeur: number, hauteur: number): string {
   const miroir = droite ? "" : ' transform="translate(100 0) scale(-1 1)"';
   return (
-    `<svg xmlns="${SVG_NS}" x="${x}" y="${y}" width="${largeur}" height="${hauteur}" viewBox="-4 0 104 120" class="dessin-main">` +
-    `<g${miroir}>` +
-    `<g fill="none" stroke="#000" stroke-width="7" stroke-linejoin="round">${FORMES_MAIN}</g>` +
-    `<g fill="#fff">${FORMES_MAIN}</g>` +
+    `<svg xmlns="${SVG_NS}" x="${x}" y="${y}" width="${largeur}" height="${hauteur}" viewBox="0 0 100 120" class="dessin-main">` +
+    `<g${miroir} fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round">` +
+    `<path d="${CONTOUR_MAIN} Z" fill="#fff" stroke="none"/>` +
+    `<path d="${CONTOUR_MAIN}" stroke-width="4.5"/>` +
+    `<path d="${DETAILS_MAIN}" stroke-width="2.4"/>` +
     `</g></svg>`
   );
 }
@@ -100,8 +113,8 @@ function dessinerMains(doc: Document) {
     const fin = parseFloat(texte.getAttribute("x") ?? "0");
     const ligne = parseFloat(texte.getAttribute("y") ?? "0");
     // À peu près la hauteur de la portée, centré sur le texte.
-    const hauteur = taille * 2.1;
-    const largeur = (hauteur * 104) / 120;
+    const hauteur = taille * 2.4;
+    const largeur = (hauteur * 100) / 120;
     const centre = ligne - taille * 0.2;
     const fragment = new DOMParser().parseFromString(
       svgMain(contenu.includes("M.D."), fin - largeur, centre - hauteur / 2, largeur, hauteur),
