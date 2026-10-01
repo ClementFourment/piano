@@ -356,14 +356,12 @@ export function Palette(p: PaletteProps) {
           Texte au-dessus de la mesure
         </label>
         <ChampTexte key={p.mesure} id="texte-mesure" valeur={p.texte} onValider={p.onTexte} placeholder="Ex. 1 : main droite seule" />
-        <div className="row2 espace">
-          <button className="btn small" onClick={p.onDupliquerMesure} title="Recopie la mesure juste après elle">
-            ⧉ Dupliquer la mesure
-          </button>
-          <button className="btn small" onClick={p.onDupliquerLigne} title="Recopie toute la ligne (le système) de la mesure courante, juste après elle">
-            ⧉ Dupliquer la ligne
-          </button>
-        </div>
+        <button className="btn small full espace" onClick={p.onDupliquerMesure} title="Recopie la mesure juste après elle">
+          ⧉ Dupliquer la mesure
+        </button>
+        <button className="btn small full espace-petit" onClick={p.onDupliquerLigne} title="Recopie toute la ligne (le système) de la mesure courante, juste après elle">
+          ⧉ Dupliquer la ligne
+        </button>
         <button className="btn small danger-outline full espace" onClick={p.onSupprimerMesure}>
           Supprimer cette mesure
         </button>
