@@ -69,7 +69,8 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 
 /**
  * Main droite vue du dessus (dos de la main, pouce à gauche), dans une boîte de 100 × 124 :
- * doigts serrés presque parallèles, pouce en biais, paume ouverte au poignet ; ongles.
+ * doigts serrés presque parallèles ; paume et pouce d'un seul contour (le pouce prolonge
+ * le bord du poignet), ouverte au poignet ; ongles.
  * Les formes sont tracées en trait épais puis remplies de blanc par-dessus : il ne reste
  * que le contour d'ensemble. (Coordonnées générées par un petit script, à la main.)
  */
@@ -78,15 +79,14 @@ const FORMES_MAIN = [
   "M 44.0 61.1 Q 43.0 39.6 44.0 18.1 C 43.9 12.9 46.2 12.0 49.6 12.0 C 53.1 11.9 55.4 12.7 55.5 17.9 Q 57.2 39.4 57.0 60.9 Z",
   "M 57.0 62.5 Q 57.8 43.1 60.5 23.7 C 60.8 18.5 63.2 17.8 66.6 18.1 C 70.1 18.3 72.3 19.3 72.0 24.5 Q 72.0 44.0 70.0 63.5 Z",
   "M 70.1 68.0 Q 72.1 53.1 76.0 38.5 C 76.9 33.9 79.1 33.5 82.2 34.0 C 85.3 34.6 87.2 35.7 86.4 40.4 Q 85.1 55.4 81.9 70.0 Z",
-  "M 29.6 100.2 Q 19.8 90.2 11.4 78.9 C 7.8 75.1 8.9 72.9 11.4 70.5 C 13.8 68.1 16.1 67.1 19.7 70.9 Q 30.8 79.6 40.4 89.8 Z",
-  "M 31 64 C 44 58, 70 59, 82.5 68 C 85 84, 83 98, 77 110 L 75 140 L 42 140 L 40 112 C 34 104, 30 92, 29.5 82 C 29 74, 29.5 68, 31 64 Z",
+  "M 42 140 L 41 116 C 34 106, 22 92, 14 80 C 10 74, 15 66, 21 69 C 26 72, 30 78, 32.5 80 C 31 74, 30.5 68, 31 64 C 44 58, 70 59, 82.5 68 C 85 84, 83 98, 77 110 L 75 140 Z",
 ];
 const DETAILS_MAIN = [
   "M 30.9 28.4 C 30.4 24.1 36.1 23.5 36.6 27.8",
   "M 46.9 18.9 C 46.8 14.6 52.6 14.5 52.6 18.8",
   "M 63.3 24.8 C 63.6 20.5 69.3 20.9 69.0 25.2",
   "M 78.5 39.8 C 79.2 35.9 84.3 36.8 83.7 40.7",
-  "M 14.1 77.5 C 11.1 74.4 15.2 70.4 18.2 73.5",
+  "M 14.7 75.6 C 12.1 72.2 16.6 68.8 19.1 72.2",
 ].join(" ");
 
 function svgMain(droite: boolean, x: number, y: number, largeur: number, hauteur: number): string {
