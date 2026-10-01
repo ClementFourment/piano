@@ -6,7 +6,7 @@
 // - les croches et doubles croches sont ligaturées par temps.
 
 import { KEY_SIGNATURES, measureCapacity, noteBeats, type Accidental, type Articulation, type Barre, type Duration, type Measure, type Note, type Score } from "../shared/score";
-import { notesSuivantes, segments, suiviAlterations, tetesLiees } from "./solfege";
+import { cotesLiaisons, coteTetes, notesSuivantes, segments, sensHampes, suiviAlterations, tetesLiees, type Sens } from "./solfege";
 
 const DUR: Record<Duration, string> = { whole: "1", half: "2", quarter: "4", eighth: "8", sixteenth: "16" };
 const ACCID: Record<NonNullable<Accidental>, string> = { sharp: "s", flat: "f", natural: "n" };
@@ -22,7 +22,7 @@ function durAttrs(n: Note): string {
   return `dur="${DUR[n.duration]}"${n.dotted ? ' dots="1"' : ""}`;
 }
 
-function layer(notes: Note[], score: Score): string {
+function layer(notes: Note[], score: Score, sens: Map<string, Sens>): string {
   const capacity = measureCapacity(score.timeSig);
 
   // Portée vide : espace invisible (la mesure reste lisible pendant la saisie).
@@ -36,17 +36,19 @@ function layer(notes: Note[], score: Score): string {
   const element = (n: Note): string => {
     if (n.rest) return `<rest xml:id="${n.id}" ${durAttrs(n)}/>`;
     const artic = articulation(n);
+    // Sens imposé : les doigtés et les liaisons sont placés d'après lui.
+    const hampe = sens.has(n.id) ? ` stem.dir="${sens.get(n.id)}"` : "";
     const tetes = n.pitches.map((p, i) => {
       const alter = alteration(p);
       const ges = alter === 1 ? "s" : alter === -1 ? "f" : "n";
       const id = n.pitches.length > 1 ? `${n.id}${CHORD_SEP}${i}` : n.id;
       const accid = p.accidental ? ` accid="${ACCID[p.accidental]}"` : "";
-      const dur = n.pitches.length > 1 ? "" : ` ${durAttrs(n)}`;
+      const dur = n.pitches.length > 1 ? "" : ` ${durAttrs(n)}${hampe}`;
       const debut = `<note xml:id="${id}"${dur} pname="${p.letter.toLowerCase()}" oct="${p.octave}"${accid} accid.ges="${ges}"`;
       // Note seule : l'articulation va dans la note ; accord : dans l'accord.
       return artic && n.pitches.length === 1 ? `${debut}>${artic}</note>` : `${debut}/>`;
     });
-    return n.pitches.length > 1 ? `<chord xml:id="${n.id}" ${durAttrs(n)}>${artic}${tetes.join("")}</chord>` : tetes[0];
+    return n.pitches.length > 1 ? `<chord xml:id="${n.id}" ${durAttrs(n)}${hampe}>${artic}${tetes.join("")}</chord>` : tetes[0];
   };
 
   let out = "";
@@ -89,6 +91,8 @@ export function scoreToMei(score: Score): string {
   const main = (nom: string) => (score.mains ? `<label>${nom}</label><labelAbbr>${nom}</labelAbbr>` : "");
 
   const suivantes = notesSuivantes(score);
+  const sens = sensHampes(score);
+  const cotes = cotesLiaisons(score, sens);
   const ids = new Set(score.measures.flatMap((m) => [...m.treble, ...m.bass].map((n) => n.id)));
   const tete = (n: Note, i: number) => (n.pitches.length > 1 ? `${n.id}${CHORD_SEP}${i}` : n.id);
 
@@ -99,11 +103,11 @@ export function scoreToMei(score: Score): string {
         let xml = "";
         const suiv = suivantes.get(n.id);
         for (const [i, j] of tetesLiees(n, suiv)) xml += `<tie startid="#${tete(n, i)}" endid="#${tete(suiv!, j)}"/>`;
-        if (n.slurEnd && ids.has(n.slurEnd)) xml += `<slur staff="${staff}" startid="#${n.id}" endid="#${n.slurEnd}"/>`;
+        if (n.slurEnd && ids.has(n.slurEnd)) xml += `<slur staff="${staff}" curvedir="${cotes.get(n.id) ?? "above"}" startid="#${n.id}" endid="#${n.slurEnd}"/>`;
         if (n.dynamic) xml += `<dynam staff="${staff}" place="below" startid="#${n.id}">${n.dynamic}</dynam>`;
-        // Doigtés : au-dessus en main droite, en dessous en main gauche (du grave à l'aigu).
+        // Doigtés : côté des têtes de notes, sous la liaison éventuelle.
         n.pitches.forEach((p, i) => {
-          if (p.doigt) xml += `<fing staff="${staff}" place="${staff === 1 ? "above" : "below"}" startid="#${tete(n, i)}">${p.doigt}</fing>`;
+          if (p.doigt) xml += `<fing staff="${staff}" place="${coteTetes(sens.get(n.id))}" startid="#${tete(n, i)}">${p.doigt}</fing>`;
         });
         if (n.arpege && n.pitches.length > 1) xml += `<arpeg staff="${staff}" startid="#${n.id}"/>`;
         if (n.articulations?.includes("fermata")) {
@@ -120,8 +124,8 @@ export function scoreToMei(score: Score): string {
   const xmlMesures = score.measures.map(
       (m, i) =>
         `<measure xml:id="${m.id}" n="${i + 1}"${barres(m, i === derniere)}>` +
-        `<staff n="1"><layer n="1">${layer(m.treble, score)}</layer></staff>` +
-        `<staff n="2"><layer n="1">${layer(m.bass, score)}</layer></staff>` +
+        `<staff n="1"><layer n="1">${layer(m.treble, score, sens)}</layer></staff>` +
+        `<staff n="2"><layer n="1">${layer(m.bass, score, sens)}</layer></staff>` +
         indications(m.treble, 1) +
         indications(m.bass, 2) +
         (i === 0 && !score.tempoMasque

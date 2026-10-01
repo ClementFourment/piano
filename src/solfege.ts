@@ -157,3 +157,59 @@ export function tetesLiees(n: Note, suivante: Note | undefined): [number, number
   });
   return paires;
 }
+
+// ── Sens des hampes et placement des indications ────────────────────────────
+
+export type Sens = "up" | "down";
+
+/** Ligne du milieu de chaque portée, en degrés (octave × 7 + note) : si 4 en clé de sol, ré 3 en clé de fa. */
+const MILIEU = { treble: 4 * 7 + 6, bass: 3 * 7 + 1 };
+const degre = (p: Pitch) => p.octave * 7 + "CDEFGAB".indexOf(p.letter);
+
+/**
+ * Sens de la hampe de chaque note (règle de gravure classique) : la note la plus
+ * éloignée de la ligne du milieu décide ; à égalité, hampe en bas. Toutes les notes
+ * d'un groupe ligaturé partagent le même sens. Les silences n'en ont pas.
+ */
+export function sensHampes(score: Score): Map<string, Sens> {
+  const sens = new Map<string, Sens>();
+  const decider = (notes: Note[], milieu: number): Sens => {
+    const degres = notes.flatMap((n) => n.pitches.map(degre));
+    return milieu - Math.min(...degres) > Math.max(...degres) - milieu ? "up" : "down";
+  };
+  for (const cle of ["treble", "bass"] as const) {
+    for (const m of score.measures) {
+      for (const seg of segments(m[cle], score.timeSig)) {
+        seg.notes.forEach((n, i) => {
+          if (n.rest || sens.has(n.id)) return;
+          const groupe = seg.ligatures[i] ?? [n];
+          const s = decider(groupe, MILIEU[cle]);
+          for (const g of groupe) sens.set(g.id, s);
+        });
+      }
+    }
+  }
+  return sens;
+}
+
+/** Côté des têtes de notes : à l'opposé de la hampe (doigtés, liaisons). */
+export const coteTetes = (s: Sens | undefined): "above" | "below" => (s === "up" ? "below" : "above");
+
+/**
+ * Côté de chaque liaison de phrasé (clé : note de départ) : côté des têtes si toutes
+ * les hampes vont dans le même sens, au-dessus sinon.
+ */
+export function cotesLiaisons(score: Score, sens: Map<string, Sens>): Map<string, "above" | "below"> {
+  const cotes = new Map<string, "above" | "below">();
+  for (const cle of ["treble", "bass"] as const) {
+    const notes = score.measures.flatMap((m) => m[cle]);
+    notes.forEach((n, i) => {
+      if (!n.slurEnd) return;
+      const fin = notes.findIndex((x) => x.id === n.slurEnd);
+      if (fin < i) return;
+      const directions = new Set(notes.slice(i, fin + 1).map((x) => sens.get(x.id)).filter(Boolean));
+      cotes.set(n.id, directions.size === 1 ? coteTetes([...directions][0]) : "above");
+    });
+  }
+  return cotes;
+}

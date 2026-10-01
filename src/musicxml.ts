@@ -2,7 +2,7 @@
 // S'ouvre dans MuseScore, Sibelius, Finale, Dorico…
 
 import { KEY_SIGNATURES, measureCapacity, noteBeats, type Accidental, type Articulation, type Duration, type Note, type Score } from "../shared/score";
-import { notesSuivantes, segments, suiviAlterations, tetesLiees } from "./solfege";
+import { cotesLiaisons, coteTetes, notesSuivantes, segments, sensHampes, suiviAlterations, tetesLiees, type Sens } from "./solfege";
 
 /** Unités par noire : 12, divisible par 4 (doubles croches) et par 3 (triolets). */
 const DIVISIONS = 12;
@@ -42,12 +42,16 @@ interface Contexte {
   finsDeSoufflet: Set<string>;
   /** Note de départ d'une liaison de phrasé → numéro. */
   numeros: Map<string, number>;
+  /** Sens des hampes, et côté de chaque liaison de phrasé (clé : note de départ). */
+  sens: Map<string, Sens>;
+  cotes: Map<string, "above" | "below">;
 }
 
 function contexte(score: Score): Contexte {
   const suivantes = notesSuivantes(score);
   const ids = new Set(score.measures.flatMap((m) => [...m.treble, ...m.bass].map((n) => n.id)));
-  const ctx: Contexte = { suivantes, finsDeProlongation: new Set(), finsDeLiaison: new Map(), finsDeSoufflet: new Set(), numeros: new Map() };
+  const ctx: Contexte = { suivantes, finsDeProlongation: new Set(), finsDeLiaison: new Map(), finsDeSoufflet: new Set(), numeros: new Map(), sens: sensHampes(score), cotes: new Map() };
+  ctx.cotes = cotesLiaisons(score, ctx.sens);
   for (const cle of ["treble", "bass"] as const) {
     let numero = 0;
     for (const m of score.measures) {
@@ -131,13 +135,13 @@ function portee(notes: Note[], score: Score, staff: 1 | 2, ctx: Contexte): { xml
         let notations = (arrivee ? '<tied type="stop"/>' : "") + (depart ? '<tied type="start"/>' : "");
         // L'arpège se note sur chaque note de l'accord.
         if (n.arpege && n.pitches.length > 1) notations += "<arpeggiate/>";
-        if (p.doigt) notations += `<technical><fingering placement="${staff === 1 ? "above" : "below"}">${p.doigt}</fingering></technical>`;
+        if (p.doigt) notations += `<technical><fingering placement="${coteTetes(ctx.sens.get(n.id))}">${p.doigt}</fingering></technical>`;
         if (i === 0) {
           notations += marqueTriolet + articulationsXml(n);
           const finLiaison = ctx.finsDeLiaison.get(n.id);
           if (finLiaison) notations += `<slur type="stop" number="${finLiaison}"/>`;
           const debutLiaison = ctx.numeros.get(n.id);
-          if (debutLiaison) notations += `<slur type="start" number="${debutLiaison}" placement="above"/>`;
+          if (debutLiaison) notations += `<slur type="start" number="${debutLiaison}" placement="${ctx.cotes.get(n.id) ?? "above"}"/>`;
         }
         xml +=
           `<note>${i > 0 ? "<chord/>" : ""}` +
@@ -145,6 +149,7 @@ function portee(notes: Note[], score: Score, staff: 1 | 2, ctx: Contexte): { xml
           `<duration>${d}</duration>${ties}${figure}` +
           (p.accidental ? `<accidental>${ACCIDENT[p.accidental]}</accidental>` : "") +
           modification +
+          (n.duration !== "whole" && ctx.sens.has(n.id) ? `<stem>${ctx.sens.get(n.id)}</stem>` : "") +
           `<staff>${staff}</staff>` +
           (i === 0 ? ligatures(n, info.ligature) : "") +
           (notations ? `<notations>${notations}</notations>` : "") +
