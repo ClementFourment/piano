@@ -69,29 +69,24 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 
 /**
  * Main droite vue du dessus (dos de la main, pouce à gauche), dans une boîte de 100 × 124 :
- * doigts effilés en éventail, pouce, paume ouverte au poignet ; ongles et plis des doigts.
+ * doigts serrés presque parallèles, pouce en biais, paume ouverte au poignet ; ongles.
  * Les formes sont tracées en trait épais puis remplies de blanc par-dessus : il ne reste
  * que le contour d'ensemble. (Coordonnées générées par un petit script, à la main.)
  */
 const FORMES_MAIN = [
-  "M 33.6 62.9 Q 30.1 41.2 28.7 19.2 C 28.0 14.5 30.0 13.4 33.1 13.0 C 36.2 12.5 38.4 13.0 39.1 17.7 Q 43.7 39.3 46.4 61.1 Z",
-  "M 46.8 58.1 Q 45.9 33.1 47.1 8.1 C 47.0 3.2 49.2 2.3 52.5 2.2 C 55.8 2.2 58.0 3.0 58.1 7.9 Q 60.2 32.9 60.2 57.9 Z",
-  "M 60.0 59.3 Q 62.0 36.9 66.0 14.7 C 66.5 10.0 68.6 9.4 71.8 9.8 C 74.9 10.1 76.9 11.1 76.4 15.8 Q 75.7 38.3 73.0 60.7 Z",
-  "M 72.4 64.5 Q 76.5 48.0 82.5 32.0 C 83.5 28.1 85.4 27.9 88.0 28.6 C 90.6 29.3 92.2 30.4 91.1 34.3 Q 88.3 51.2 83.6 67.5 Z",
-  "M 30.5 99.5 Q 19.2 85.4 9.5 70.1 C 6.1 66.2 7.3 64.0 10.0 61.8 C 12.6 59.6 14.9 58.8 18.3 62.7 Q 31.7 75.0 43.5 88.5 Z",
-  "M 34 60 C 46 54, 72 56, 84 66 C 87 80, 83 96, 77 110 L 75 140 L 43 140 L 41 112 C 36 104, 31 94, 30 84 C 29 74, 30 65, 34 60 Z",
+  "M 31.0 64.7 Q 28.5 46.3 27.9 27.8 C 27.4 22.7 29.6 21.6 33.0 21.2 C 36.4 20.8 38.8 21.5 39.4 26.6 Q 42.7 44.9 44.0 63.3 Z",
+  "M 44.0 61.1 Q 43.0 39.6 44.0 18.1 C 43.9 12.9 46.2 12.0 49.6 12.0 C 53.1 11.9 55.4 12.7 55.5 17.9 Q 57.2 39.4 57.0 60.9 Z",
+  "M 57.0 62.5 Q 57.8 43.1 60.5 23.7 C 60.8 18.5 63.2 17.8 66.6 18.1 C 70.1 18.3 72.3 19.3 72.0 24.5 Q 72.0 44.0 70.0 63.5 Z",
+  "M 70.1 68.0 Q 72.1 53.1 76.0 38.5 C 76.9 33.9 79.1 33.5 82.2 34.0 C 85.3 34.6 87.2 35.7 86.4 40.4 Q 85.1 55.4 81.9 70.0 Z",
+  "M 29.6 100.2 Q 19.8 90.2 11.4 78.9 C 7.8 75.1 8.9 72.9 11.4 70.5 C 13.8 68.1 16.1 67.1 19.7 70.9 Q 30.8 79.6 40.4 89.8 Z",
+  "M 31 64 C 44 58, 70 59, 82.5 68 C 85 84, 83 98, 77 110 L 75 140 L 42 140 L 40 112 C 34 104, 30 92, 29.5 82 C 29 74, 29.5 68, 31 64 Z",
 ];
 const DETAILS_MAIN = [
-  "M 31.4 19.6 C 30.8 15.7 36.0 14.9 36.6 18.8",
-  "M 33.0 34.7 Q 36.2 35.2 39.2 33.8",
-  "M 49.9 8.9 C 49.8 4.8 55.3 4.7 55.4 8.8",
-  "M 49.6 26.1 Q 53.0 26.9 56.2 25.9",
-  "M 68.5 15.8 C 68.9 11.8 74.1 12.4 73.7 16.3",
-  "M 66.4 30.8 Q 69.4 32.1 72.7 31.5",
-  "M 84.5 33.2 C 85.3 30.0 89.7 31.1 88.8 34.4",
-  "M 81.1 44.1 Q 83.5 45.6 86.3 45.4",
-  "M 12.2 68.9 C 9.4 65.6 13.8 61.9 16.6 65.2",
-  "M 20.9 80.1 Q 24.1 78.6 26.1 75.7",
+  "M 30.9 28.4 C 30.4 24.1 36.1 23.5 36.6 27.8",
+  "M 46.9 18.9 C 46.8 14.6 52.6 14.5 52.6 18.8",
+  "M 63.3 24.8 C 63.6 20.5 69.3 20.9 69.0 25.2",
+  "M 78.5 39.8 C 79.2 35.9 84.3 36.8 83.7 40.7",
+  "M 14.1 77.5 C 11.1 74.4 15.2 70.4 18.2 73.5",
 ].join(" ");
 
 function svgMain(droite: boolean, x: number, y: number, largeur: number, hauteur: number): string {
@@ -102,7 +97,7 @@ function svgMain(droite: boolean, x: number, y: number, largeur: number, hauteur
   return (
     `<svg xmlns="${SVG_NS}" x="${x}" y="${y}" width="${largeur}" height="${hauteur}" viewBox="0 0 100 124" class="dessin-main">` +
     `<g${miroir}>` +
-    `<g fill="none" stroke="#000" stroke-width="6" stroke-linejoin="round">${formes}</g>` +
+    `<g fill="none" stroke="#000" stroke-width="4" stroke-linejoin="round">${formes}</g>` +
     `<g fill="#fff">${remplissage}</g>` +
     `<path d="${DETAILS_MAIN}" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round"/>` +
     `</g></svg>`
@@ -118,7 +113,7 @@ function dessinerMains(doc: Document) {
     const fin = parseFloat(texte.getAttribute("x") ?? "0");
     const ligne = parseFloat(texte.getAttribute("y") ?? "0");
     // À peu près la hauteur de la portée, centré sur le texte.
-    const hauteur = taille * 2.4;
+    const hauteur = taille * 1.9;
     const largeur = (hauteur * 100) / 124;
     const centre = ligne - taille * 0.2;
     const fragment = new DOMParser().parseFromString(
