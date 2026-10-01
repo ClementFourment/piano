@@ -58,6 +58,22 @@ export function Library({ user, onOpen, onLogout }: Props) {
     }
   }
 
+  async function dupliquer(id: string) {
+    setBusy(true);
+    setError("");
+    try {
+      const original = await api.score(id);
+      const titre = `${original.title} (copie)`.slice(0, 200);
+      const data = original.kind === "score" ? JSON.stringify({ ...JSON.parse(original.data), title: titre }) : original.data;
+      const copie = await api.create(original.kind, data, titre, original.composer);
+      setScores((s) => [copie, ...(s ?? [])]);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function supprimer(id: string) {
     try {
       await api.remove(id);
@@ -135,6 +151,9 @@ export function Library({ user, onOpen, onLogout }: Props) {
                   {s.kind === "mei" && <span className="badge">importée</span>}
                   {s.shareToken && <span className="badge accent">partagée</span>}
                 </span>
+              </button>
+              <button className="btn small ghost" onClick={() => dupliquer(s.id)} disabled={busy} title="Dupliquer" aria-label={`Dupliquer ${s.title}`}>
+                ⧉
               </button>
               {aSupprimer === s.id ? (
                 <span className="confirm-inline">

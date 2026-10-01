@@ -217,6 +217,9 @@ export function scoreToMusicXml(score: Score): string {
               `<per-minute>${score.tempo}</per-minute></metronome></direction-type>` +
               `<staff>1</staff><sound tempo="${score.tempo}"/></direction>`);
       }
+      if (m.texte) {
+        xml += `<direction placement="above"><direction-type><words>${esc(m.texte)}</words></direction-type><staff>1</staff></direction>`;
+      }
       const haut = portee(m.treble, score, 1, ctx);
       const bas = portee(m.bass, score, 2, ctx);
       xml += haut.xml + `<backup><duration>${haut.duree}</duration></backup>` + bas.xml;

@@ -405,18 +405,44 @@ export function supprimerMesure(etat: Etat, mesure: number): Resultat {
   };
 }
 
-type ReglagesMesure = Pick<Measure, "barre" | "repriseDebut" | "volta">;
+type ReglagesMesure = Pick<Measure, "barre" | "repriseDebut" | "volta" | "texte">;
 
-/** Barre de fin, début de reprise, case : une valeur `undefined` retire le réglage. */
+/** Barre de fin, début de reprise, case, texte : une valeur `undefined` (ou vide) retire le réglage. */
 export function reglerMesure(etat: Etat, mesure: number, reglages: Partial<ReglagesMesure>): Etat {
   const measures = etat.score.measures.slice();
   const m: Measure = { ...measures[mesure] };
   for (const [cle, valeur] of Object.entries(reglages) as [keyof ReglagesMesure, never][]) {
-    if (valeur === undefined || valeur === false) delete m[cle];
+    if (valeur === undefined || valeur === false || valeur === "") delete m[cle];
     else m[cle] = valeur;
   }
   measures[mesure] = m;
   return { ...etat, score: { ...etat.score, measures } };
+}
+
+/**
+ * Recopie les mesures `debut` à `fin` juste après `fin`, avec de nouveaux identifiants.
+ * Les liaisons et soufflets internes à la copie suivent ; ceux qui en sortent sont retirés.
+ */
+export function dupliquerMesures(etat: Etat, debut: number, fin: number): Resultat {
+  const originales = etat.score.measures.slice(debut, fin + 1);
+  if (etat.score.measures.length + originales.length > 2000) return "Trop de mesures (2000 maximum).";
+  const nouveaux = new Map<string, string>();
+  for (const m of originales) for (const n of [...m.treble, ...m.bass]) nouveaux.set(n.id, newId());
+  const copierNote = ({ slurEnd, hairpin, ...n }: Note): Note => {
+    const copie: Note = { ...n, id: nouveaux.get(n.id)! };
+    if (slurEnd && nouveaux.has(slurEnd)) copie.slurEnd = nouveaux.get(slurEnd);
+    if (hairpin && nouveaux.has(hairpin.end)) copie.hairpin = { ...hairpin, end: nouveaux.get(hairpin.end)! };
+    return copie;
+  };
+  const copies = originales.map((m) => ({ ...m, id: newId(), treble: m.treble.map(copierNote), bass: m.bass.map(copierNote) }));
+  const measures = etat.score.measures.slice();
+  measures.splice(fin + 1, 0, ...copies);
+  const cle = etat.curseur.cle;
+  return {
+    score: { ...etat.score, measures },
+    curseur: { mesure: fin + 1, cle, index: measures[fin + 1][cle].length },
+    selection: null,
+  };
 }
 
 const estVide = (m: Measure) => [...m.treble, ...m.bass].every((n) => n.rest);

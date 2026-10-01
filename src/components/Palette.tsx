@@ -101,6 +101,10 @@ export interface PaletteProps {
   onBarre: (b: Barre) => void;
   onRepriseDebut: (v: boolean) => void;
   onVolta: (v: 1 | 2 | null) => void;
+  texte: string;
+  onTexte: (t: string) => void;
+  onDupliquerMesure: () => void;
+  onDupliquerLigne: () => void;
   onTempo: (t: number) => void;
   onTempoVisible: (v: boolean) => void;
   onMains: (v: boolean) => void;
@@ -348,6 +352,18 @@ export function Palette(p: PaletteProps) {
           <option value="1">1re fois (jouée avant de reprendre)</option>
           <option value="2">2e fois (jouée après la reprise)</option>
         </select>
+        <label className="field-label" htmlFor="texte-mesure">
+          Texte au-dessus de la mesure
+        </label>
+        <ChampTexte key={p.mesure} id="texte-mesure" valeur={p.texte} onValider={p.onTexte} placeholder="Ex. 1 : main droite seule" />
+        <div className="row2 espace">
+          <button className="btn small" onClick={p.onDupliquerMesure} title="Recopie la mesure juste après elle">
+            ⧉ Dupliquer la mesure
+          </button>
+          <button className="btn small" onClick={p.onDupliquerLigne} title="Recopie toute la ligne (le système) de la mesure courante, juste après elle">
+            ⧉ Dupliquer la ligne
+          </button>
+        </div>
         <button className="btn small danger-outline full espace" onClick={p.onSupprimerMesure}>
           Supprimer cette mesure
         </button>
@@ -452,6 +468,24 @@ function ChampTempo({ tempo, onTempo }: { tempo: number; onTempo: (t: number) =>
         if (t >= TEMPO_MIN && t <= TEMPO_MAX) onTempo(t);
       }}
       onBlur={valider}
+      onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+    />
+  );
+}
+
+/** Champ texte appliqué en quittant le champ (ou avec Entrée), pour ne pas remplir l'historique à chaque lettre. */
+function ChampTexte({ id, valeur, onValider, placeholder }: { id: string; valeur: string; onValider: (t: string) => void; placeholder?: string }) {
+  const [texte, setTexte] = useState(valeur);
+  useEffect(() => setTexte(valeur), [valeur]);
+  return (
+    <input
+      id={id}
+      type="text"
+      maxLength={200}
+      value={texte}
+      placeholder={placeholder}
+      onChange={(e) => setTexte(e.target.value)}
+      onBlur={() => texte.trim() !== valeur && onValider(texte.trim())}
       onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
     />
   );

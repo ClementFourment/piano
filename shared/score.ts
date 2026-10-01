@@ -74,6 +74,8 @@ export interface Measure {
   repriseDebut?: boolean;
   /** Case de première ou deuxième fois (les mesures consécutives d'une même case forment un seul crochet). */
   volta?: 1 | 2;
+  /** Texte écrit au-dessus du début de la mesure (consigne, indication). */
+  texte?: string;
 }
 
 export interface Score {
@@ -226,6 +228,7 @@ export function lireScore(v: unknown): Score | string {
     if (BARRES.includes(m.barre as Barre)) mesure.barre = m.barre as Barre;
     if (m.repriseDebut === true) mesure.repriseDebut = true;
     if (m.volta === 1 || m.volta === 2) mesure.volta = m.volta;
+    if (typeof m.texte === "string" && m.texte.trim()) mesure.texte = m.texte.trim().slice(0, LIMITES.titre);
     measures.push(mesure);
   }
 

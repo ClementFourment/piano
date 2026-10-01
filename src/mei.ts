@@ -128,6 +128,7 @@ export function scoreToMei(score: Score): string {
         `<staff n="2"><layer n="1">${layer(m.bass, score, sens)}</layer></staff>` +
         indications(m.treble, 1) +
         indications(m.bass, 2) +
+        (m.texte ? `<dir staff="1" place="above" tstamp="0"><rend fontstyle="normal">${esc(m.texte)}</rend></dir>` : "") +
         (i === 0 && !score.tempoMasque
           ? `<tempo tstamp="1" staff="1" place="above" mm="${score.tempo}" mm.unit="4" midi.bpm="${score.tempo}">` +
             `<rend fontstyle="normal"><rend glyph.auth="smufl">&#xE1D5;</rend> = ${score.tempo}</rend></tempo>`

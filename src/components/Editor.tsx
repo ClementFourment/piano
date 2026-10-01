@@ -155,6 +155,23 @@ export function Editor({ doc, onBack, onChange }: Props) {
     appliquer({ ...etat, selection: null, curseur: { mesure, cle, index: score.measures[mesure][cle].length } }, false);
   }
 
+  function dupliquer(debut: number, fin: number) {
+    const res = M.dupliquerMesures(etat, debut, fin);
+    appliquer(res);
+    const n = fin - debut + 1;
+    if (typeof res !== "string") signaler(n === 1 ? "Mesure dupliquée." : `${n} mesures dupliquées (Ctrl+Z pour annuler).`);
+  }
+
+  /** Duplique les mesures de la ligne (système) où se trouve le curseur, d'après le rendu. */
+  function dupliquerLigne() {
+    const mesure = feuilles.current?.querySelector(`[id="${CSS.escape(score.measures[curseur.mesure].id)}"]`);
+    const systeme = mesure?.closest(".system");
+    if (!systeme) return signaler("Ligne introuvable : attendez la fin de l'affichage.");
+    const ids = new Set(Array.from(systeme.querySelectorAll(".measure"), (el) => el.id));
+    const indices = score.measures.flatMap((m, i) => (ids.has(m.id) ? [i] : []));
+    dupliquer(indices[0], indices[indices.length - 1]);
+  }
+
   function modifierScore(patch: Partial<Score>) {
     appliquer({ ...etat, score: { ...score, ...patch } }, false);
   }
@@ -460,6 +477,10 @@ export function Editor({ doc, onBack, onChange }: Props) {
               onBarre={(b) => appliquer(M.reglerMesure(etat, curseur.mesure, { barre: b }))}
               onRepriseDebut={(v) => appliquer(M.reglerMesure(etat, curseur.mesure, { repriseDebut: v }))}
               onVolta={(v) => appliquer(M.reglerMesure(etat, curseur.mesure, { volta: v ?? undefined }))}
+              texte={mesureCourante.texte ?? ""}
+              onTexte={(t) => appliquer(M.reglerMesure(etat, curseur.mesure, { texte: t }))}
+              onDupliquerMesure={() => dupliquer(curseur.mesure, curseur.mesure)}
+              onDupliquerLigne={dupliquerLigne}
               onTempo={(t) => modifierScore({ tempo: t })}
               onTempoVisible={(v) => appliquer({ ...etat, score: { ...score, tempoMasque: v ? undefined : true } })}
               onMains={(v) => appliquer({ ...etat, score: { ...score, mains: v || undefined } })}
