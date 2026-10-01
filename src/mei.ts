@@ -11,8 +11,8 @@ import { coteTetes, cotesLiaisons, notesSuivantes, segments, sensHampes, suiviAl
 const DUR: Record<Duration, string> = { whole: "1", half: "2", quarter: "4", eighth: "8", sixteenth: "16" };
 const ACCID: Record<NonNullable<Accidental>, string> = { sharp: "s", flat: "f", natural: "n" };
 
-/** Hauteur d'un chiffre de doigté, en demi-interlignes (unités MEI « vu »). */
-const HAUTEUR_DOIGT = 3;
+/** Écart pour faire passer un doigté au-delà d'un bout de liaison, en demi-interlignes (« vu »). */
+const ECART_LIAISON = 2;
 
 /** Suffixe des identifiants des notes d'un accord : `${id}${CHORD_SEP}${i}`. */
 export const CHORD_SEP = "-";
@@ -99,26 +99,20 @@ export function scoreToMei(score: Score): string {
   const parId = new Map(score.measures.flatMap((m) => [...m.treble, ...m.bass]).map((n) => [n.id, n]));
 
   /**
-   * Décalage vertical (en demi-interlignes) d'un bout de liaison posé sur une ronde doigtée
-   * du même côté : sans hampe, Verovio part de la tête et passerait sur le chiffre.
-   * (Pour les notes à hampe, il écarte lui-même le chiffre.)
+   * Rondes doigtées au bout d'une liaison du même côté : sans hampe, Verovio fait partir
+   * la liaison de la tête, à l'endroit du chiffre. La liaison garde son départ contre la
+   * note et le chiffre est repoussé au-delà. (Pour les notes à hampe, Verovio s'en charge.)
    */
-  const decalage = (n: Note | undefined, cote: "above" | "below") => {
-    const chiffres = n?.duration === "whole" ? n.pitches.filter((p) => p.doigt).length : 0;
-    if (!chiffres || coteTetes(sens.get(n!.id)) !== cote) return 0;
-    return (cote === "above" ? 1 : -1) * (chiffres * HAUTEUR_DOIGT + 1);
-  };
-  const liaison = (n: Note, staff: 1 | 2) => {
-    const cote = cotes.get(n.id) ?? "above";
-    const debut = decalage(n, cote);
-    const fin = decalage(parId.get(n.slurEnd!), cote);
-    return (
-      `<slur staff="${staff}" curvedir="${cote}" startid="#${n.id}" endid="#${n.slurEnd}"` +
-      (debut ? ` startvo="${debut}vu"` : "") +
-      (fin ? ` endvo="${fin}vu"` : "") +
-      `/>`
-    );
-  };
+  const chiffresRepousses = new Set<string>();
+  for (const n of parId.values()) {
+    const cote = cotes.get(n.id);
+    if (!n.slurEnd || !cote) continue;
+    for (const x of [n, parId.get(n.slurEnd)]) {
+      if (x?.duration === "whole" && coteTetes(sens.get(x.id)) === cote) chiffresRepousses.add(x.id);
+    }
+  }
+  const liaison = (n: Note, staff: 1 | 2) =>
+    `<slur staff="${staff}" curvedir="${cotes.get(n.id) ?? "above"}" startid="#${n.id}" endid="#${n.slurEnd}"/>`;
   const ids = new Set(score.measures.flatMap((m) => [...m.treble, ...m.bass].map((n) => n.id)));
   const tete = (n: Note, i: number) => (n.pitches.length > 1 ? `${n.id}${CHORD_SEP}${i}` : n.id);
 
@@ -133,7 +127,10 @@ export function scoreToMei(score: Score): string {
         if (n.dynamic) xml += `<dynam staff="${staff}" place="below" startid="#${n.id}">${n.dynamic}</dynam>`;
         // Doigtés : côté des têtes de notes, sous la liaison éventuelle.
         n.pitches.forEach((p, i) => {
-          if (p.doigt) xml += `<fing staff="${staff}" place="${coteTetes(sens.get(n.id))}" startid="#${tete(n, i)}">${p.doigt}</fing>`;
+          if (!p.doigt) return;
+          const place = coteTetes(sens.get(n.id));
+          const vo = chiffresRepousses.has(n.id) ? ` vo="${place === "above" ? ECART_LIAISON : -ECART_LIAISON}vu"` : "";
+          xml += `<fing staff="${staff}" place="${place}"${vo} startid="#${tete(n, i)}">${p.doigt}</fing>`;
         });
         if (n.arpege && n.pitches.length > 1) xml += `<arpeg staff="${staff}" startid="#${n.id}"/>`;
         if (n.articulations?.includes("fermata")) {
