@@ -82,6 +82,8 @@ export interface Measure {
   texte?: string;
 }
 
+export type Mains = "texte" | "dessin";
+
 export interface Score {
   version: 1;
   title: string;
@@ -89,8 +91,8 @@ export interface Score {
   tempo: number;
   /** Indication de tempo masquée sur la partition (la lecture garde le tempo). */
   tempoMasque?: boolean;
-  /** « M.D. » et « M.G. » écrits devant chaque système. */
-  mains?: boolean;
+  /** Main devant chaque portée, sur chaque système : « M.D. » / « M.G. », ou un dessin de main. */
+  mains?: Mains;
   timeSig: { num: number; den: number };
   keySignature: KeySignature;
   measures: Measure[];
@@ -275,7 +277,8 @@ export function lireScore(v: unknown): Score | string {
     composer: texte(v.composer, ""),
     tempo: tempo as number,
     ...(v.tempoMasque === true ? { tempoMasque: true } : {}),
-    ...(v.mains === true ? { mains: true } : {}),
+    // `true` : ancien format (case à cocher), équivaut à « texte ».
+    ...(v.mains === true || v.mains === "texte" ? { mains: "texte" as const } : v.mains === "dessin" ? { mains: "dessin" as const } : {}),
     timeSig: { num: num as number, den: den as number },
     keySignature,
     measures,

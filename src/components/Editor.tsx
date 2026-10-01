@@ -462,7 +462,7 @@ export function Editor({ doc, onBack, onChange }: Props) {
               nbMesures={score.measures.length}
               tempo={score.tempo}
               tempoVisible={!score.tempoMasque}
-              mains={!!score.mains}
+              mains={score.mains ?? null}
               chiffrage={`${score.timeSig.num}/${score.timeSig.den}`}
               armure={score.keySignature}
               peutAnnuler={passe.length > 0}
@@ -497,7 +497,7 @@ export function Editor({ doc, onBack, onChange }: Props) {
               onDupliquerLigne={dupliquerLigne}
               onTempo={(t) => modifierScore({ tempo: t })}
               onTempoVisible={(v) => appliquer({ ...etat, score: { ...score, tempoMasque: v ? undefined : true } })}
-              onMains={(v) => appliquer({ ...etat, score: { ...score, mains: v || undefined } })}
+              onMains={(v) => appliquer({ ...etat, score: { ...score, mains: v ?? undefined } })}
               onChiffrage={(c) => {
                 const [num, den] = c.split("/").map(Number);
                 appliquer(M.changerChiffrage(etat, num, den));

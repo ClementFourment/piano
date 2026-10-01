@@ -1,7 +1,7 @@
 // Palette d'outils de l'éditeur (colonne de gauche), reprise du prototype.
 
 import { useEffect, useState } from "react";
-import { DOIGTS, DYNAMICS, KEY_SIGNATURES, type Doigt, type Accidental, type Articulation, type Barre, type Clef, type Duration, type Dynamic, type KeySignature, type Letter, type Voix } from "../../shared/score";
+import { DOIGTS, DYNAMICS, KEY_SIGNATURES, type Doigt, type Accidental, type Articulation, type Barre, type Clef, type Duration, type Dynamic, type KeySignature, type Letter, type Mains, type Voix } from "../../shared/score";
 
 export const NOMS_NOTES: Record<Letter, string> = { C: "Do", D: "Ré", E: "Mi", F: "Fa", G: "Sol", A: "La", B: "Si" };
 
@@ -63,7 +63,7 @@ export interface PaletteProps {
   nbMesures: number;
   tempo: number;
   tempoVisible: boolean;
-  mains: boolean;
+  mains: Mains | null;
   chiffrage: string;
   armure: KeySignature;
   peutAnnuler: boolean;
@@ -109,7 +109,7 @@ export interface PaletteProps {
   onDupliquerLigne: () => void;
   onTempo: (t: number) => void;
   onTempoVisible: (v: boolean) => void;
-  onMains: (v: boolean) => void;
+  onMains: (v: Mains | null) => void;
   onChiffrage: (c: string) => void;
   onArmure: (k: KeySignature) => void;
   onAnnuler: () => void;
@@ -389,9 +389,14 @@ export function Palette(p: PaletteProps) {
         <label className="dot-row">
           <input type="checkbox" checked={p.tempoVisible} onChange={(e) => p.onTempoVisible(e.target.checked)} /> Afficher le tempo sur la partition
         </label>
-        <label className="dot-row" title="M.D. devant la portée du haut, M.G. devant celle du bas">
-          <input type="checkbox" checked={p.mains} onChange={(e) => p.onMains(e.target.checked)} /> Écrire M.D. / M.G. devant les portées
+        <label className="field-label" htmlFor="mains">
+          Devant les portées
         </label>
+        <select id="mains" value={p.mains ?? ""} onChange={(e) => p.onMains((e.target.value || null) as Mains | null)}>
+          <option value="">Rien</option>
+          <option value="texte">M.D. / M.G.</option>
+          <option value="dessin">Dessin des mains (pour les plus petits)</option>
+        </select>
         <label className="field-label" htmlFor="chiffrage">
           Chiffrage
         </label>

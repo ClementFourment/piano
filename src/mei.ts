@@ -14,6 +14,9 @@ const ACCID: Record<NonNullable<Accidental>, string> = { sharp: "s", flat: "f", 
 /** Écart pour faire passer un doigté au-delà d'un bout de liaison, en demi-interlignes (« vu »). */
 const ECART_LIAISON = 2;
 
+/** Marque (espace de largeur nulle) des noms de mains à remplacer par un dessin (voir verovio.ts). */
+export const MARQUE_DESSIN_MAIN = "\u200B";
+
 /** Suffixe des identifiants des notes d'un accord : `${id}${CHORD_SEP}${i}`. */
 export const CHORD_SEP = "-";
 
@@ -91,7 +94,12 @@ export function scoreToMei(score: Score): string {
   const compositeur = esc(score.composer);
 
   /** Nom de la main devant la portée, sur chaque système. */
-  const main = (nom: string) => (score.mains ? `<label>${nom}</label><labelAbbr>${nom}</labelAbbr>` : "");
+  // Pour le dessin, le texte (qui réserve la place) porte une marque invisible : il est remplacé après le rendu.
+  const main = (nom: string) => {
+    if (!score.mains) return "";
+    const texte = nom + (score.mains === "dessin" ? MARQUE_DESSIN_MAIN : "");
+    return `<label>${texte}</label><labelAbbr>${texte}</labelAbbr>`;
+  };
 
   const suivantes = notesSuivantes(score);
   const sens = sensHampes(score);
